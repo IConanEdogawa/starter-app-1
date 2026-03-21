@@ -1,0 +1,23 @@
+{
+  "name": "KURS VIP App",
+  "short_name": "KURS VIP",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#07070d",
+  "theme_color": "#0a0a0f",
+  "description": "VIP panel for currency operations and analytics",
+  "icons": [
+    {
+      "src": "/icons/vip-icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/vip-icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

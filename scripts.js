@@ -1,6 +1,22 @@
 // ===== DATA STORE =====
 const AUTH_KEY = 'kurs_auth';
-const API_BASE = localStorage.getItem('api_base') || 'http://localhost:5075';
+const API_BASE = resolveApiBase();
+const inviteToken = new URLSearchParams(window.location.search).get('invite');
+
+function resolveApiBase() {
+  const fromStorage = (localStorage.getItem('api_base') || '').trim();
+  if (fromStorage) return fromStorage.replace(/\/$/, '');
+
+  const fromMeta = (document.querySelector('meta[name="api-base"]')?.getAttribute('content') || '').trim();
+  if (fromMeta) return fromMeta.replace(/\/$/, '');
+
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return 'http://localhost:5075';
+  }
+
+  return window.location.origin.replace(/\/$/, '');
+}
 
 let DB = {
   customers: [],
@@ -26,6 +42,7 @@ let analyticsCustomer = null;
 let scene, camera, renderer, pieGroup;
 let animFrameId;
 let authSession = null;
+let lastSavedTransaction = null;
 
 // ===== NAVIGATION =====
 function switchPage(p) {
@@ -56,13 +73,15 @@ function applyRoleUi() {
     txn: document.getElementById('nav-txn'),
     analytics: document.getElementById('nav-analytics'),
     expenses: document.getElementById('nav-expenses'),
-    profits: document.getElementById('nav-profits')
+    profits: document.getElementById('nav-profits'),
+    invite: document.getElementById('nav-invite')
   };
 
   if (role === 'worker') {
     navMap.analytics.style.display = 'none';
     navMap.expenses.style.display = 'none';
     navMap.profits.style.display = 'none';
+    navMap.invite.style.display = 'none';
     switchPage('txn');
     return;
   }
@@ -70,6 +89,7 @@ function applyRoleUi() {
   navMap.analytics.style.display = '';
   navMap.expenses.style.display = '';
   navMap.profits.style.display = '';
+  navMap.invite.style.display = '';
 }
 
 function switchAuthTab(tab) {
@@ -77,6 +97,31 @@ function switchAuthTab(tab) {
   document.getElementById('auth-tab-register').className = 'auth-tab' + (tab === 'register' ? ' active' : '');
   document.getElementById('auth-login-panel').style.display = tab === 'login' ? 'block' : 'none';
   document.getElementById('auth-register-panel').style.display = tab === 'register' ? 'block' : 'none';
+}
+
+async function setupInviteRegistrationMode() {
+  const registerTab = document.getElementById('auth-tab-register');
+  const banner = document.getElementById('invite-banner');
+  if (!inviteToken) {
+    registerTab.style.display = 'none';
+    return;
+  }
+
+  registerTab.style.display = 'block';
+  banner.style.display = 'block';
+  banner.textContent = 'Invite link aniqlandi. Faqat Worker ro\'yxatdan o\'tishi mumkin.';
+  switchAuthTab('register');
+
+  try {
+    const res = await apiRequest('/api/invites/worker/validate?token=' + encodeURIComponent(inviteToken));
+    if (!res.valid) {
+      banner.textContent = 'Invite token yaroqsiz: ' + (res.reason || 'Noma\'lum xato');
+      document.getElementById('register-username').disabled = true;
+      document.getElementById('register-password').disabled = true;
+    }
+  } catch {
+    banner.textContent = 'Invite tokenni tekshirishda xato.';
+  }
 }
 
 function setAuthSession(payload) {
@@ -137,23 +182,27 @@ async function apiRequest(path, options = {}) {
   return body;
 }
 
-async function registerUser() {
+async function registerWorkerUser() {
   const userName = document.getElementById('register-username').value.trim();
   const password = document.getElementById('register-password').value.trim();
-  const role = document.getElementById('register-role').value;
 
   if (!userName || !password) {
     showToast('Username va parol kiriting', 'error');
     return;
   }
 
+  if (!inviteToken) {
+    showToast('Ro\'yxatdan o\'tish faqat invite link orqali', 'error');
+    return;
+  }
+
   try {
-    const payload = await apiRequest('/api/auth/register', {
+    const payload = await apiRequest('/api/auth/register-worker', {
       method: 'POST',
-      body: JSON.stringify({ userName, password, role })
+      body: JSON.stringify({ userName, password, inviteToken })
     });
     setAuthSession(payload);
-    showToast('Ro\'yxatdan o\'tish muvaffaqiyatli', 'success');
+    showToast('Worker ro\'yxatdan o\'tdi', 'success');
   } catch (e) {
     showToast('Register xato: ' + e.message, 'error');
   }
@@ -201,6 +250,96 @@ async function checkExistingSession() {
 function logoutUser() {
   clearAuthSession();
   showToast('Session yopildi', 'success');
+}
+
+async function registerVipServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    await navigator.serviceWorker.register('/sw.js');
+  } catch {
+    // Ignore SW registration errors in unsupported hosting contexts.
+  }
+}
+
+async function notifyLastTransaction() {
+  if (!authSession) {
+    showToast('Avval tizimga kiring', 'error');
+    return;
+  }
+
+  const role = (authSession.role || '').toLowerCase();
+  if (role === 'worker') {
+    showToast('Worker notify yubora olmaydi', 'error');
+    return;
+  }
+
+  if (!lastSavedTransaction) {
+    showToast('Avval tranzaksiyani saqlang', 'error');
+    return;
+  }
+
+  const c = DB.customers.find(x => x.id === lastSavedTransaction.customerId);
+  const customerName = c?.name || 'Noma\'lum mijoz';
+  const amountLabel = lastSavedTransaction.type === 'won'
+    ? `${Math.round(lastSavedTransaction.amount).toLocaleString()} WON`
+    : `${lastSavedTransaction.amount.toLocaleString()} USD`;
+  const convertedLabel = lastSavedTransaction.type === 'won'
+    ? `${(lastSavedTransaction.convertedAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} USD`
+    : `${Math.round(lastSavedTransaction.convertedAmount || 0).toLocaleString()} WON`;
+
+  try {
+    await apiRequest('/api/notifications', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Yangi pul harakati',
+        message: `${customerName}: ${amountLabel}, kurs ${lastSavedTransaction.rate}, auto ${convertedLabel}`,
+        relatedType: 'transaction',
+        relatedId: lastSavedTransaction.id,
+        targetRole: 'Worker'
+      })
+    });
+    showToast('Worker ga notify yuborildi', 'success');
+  } catch (e) {
+    showToast('Notify xato: ' + e.message, 'error');
+  }
+}
+
+async function generateWorkerInviteLink() {
+  if (!authSession) {
+    showToast('Avval tizimga kiring', 'error');
+    return;
+  }
+  const role = (authSession.role || '').toLowerCase();
+  if (role !== 'vip' && role !== 'developer') {
+    showToast('Invite yaratish uchun ruxsat yo\'q', 'error');
+    return;
+  }
+
+  const hours = parseInt(document.getElementById('invite-exp-hours').value, 10) || 24;
+  try {
+    const res = await apiRequest('/api/invites/worker', {
+      method: 'POST',
+      body: JSON.stringify({ expiresInHours: hours })
+    });
+    document.getElementById('invite-link-output').value = res.link;
+    showToast('Invite link yaratildi', 'success');
+  } catch (e) {
+    showToast('Invite xato: ' + e.message, 'error');
+  }
+}
+
+async function copyWorkerInviteLink() {
+  const value = document.getElementById('invite-link-output').value;
+  if (!value) {
+    showToast('Avval link yarating', 'error');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast('Link nusxalandi', 'success');
+  } catch {
+    showToast('Nusxalashda xato', 'error');
+  }
 }
 
 // ===== CUSTOMER SEARCH =====
@@ -418,9 +557,28 @@ function clearCustomer() {
 // ===== TRANSACTION TYPE =====
 function setType(t) {
   txnType = t;
+  const txnCard = document.getElementById('txn-card');
+  const amountLabel = document.getElementById('amount-label');
+  const rateLabel = document.getElementById('rate-label');
+  const convertedLabel = document.getElementById('converted-label');
+
   document.getElementById('btn-won').className = 'type-btn' + (t === 'won' ? ' active-won' : '');
   document.getElementById('btn-usd').className = 'type-btn' + (t === 'usd' ? ' active-usd' : '');
-  document.getElementById('amount-label').textContent = t === 'won' ? 'Miqdor (WON)' : 'Miqdor (USD)';
+
+  if (t === 'won') {
+    amountLabel.textContent = 'Olingan WON';
+    rateLabel.textContent = 'Olingan kurs';
+    convertedLabel.textContent = 'Auto USD';
+    txnCard.classList.add('mode-won-red');
+    txnCard.classList.remove('mode-usd-green');
+  } else {
+    amountLabel.textContent = 'Olingan Dollar';
+    rateLabel.textContent = 'Sotilgan kurs';
+    convertedLabel.textContent = 'Auto WON';
+    txnCard.classList.add('mode-usd-green');
+    txnCard.classList.remove('mode-won-red');
+  }
+
   updateConversionPreview();
 }
 
@@ -438,10 +596,8 @@ function updateConversionPreview() {
 
   const converted = txnType === 'won' ? amount / rate : amount * rate;
   if (txnType === 'won') {
-    convertedLabel.textContent = 'Hisoblangan USD';
     convertedOutput.value = converted.toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' $';
   } else {
-    convertedLabel.textContent = 'Hisoblangan WON';
     convertedOutput.value = Math.round(converted).toLocaleString() + ' ₩';
   }
 
@@ -469,6 +625,7 @@ function saveTransaction() {
   };
 
   DB.transactions.push(txn);
+  lastSavedTransaction = txn;
   save();
   showToast('Tranzaksiya saqlandi', 'success');
   resetForm();
@@ -977,6 +1134,8 @@ loadMockData();
 setNow();
 updateConversionPreview();
 checkExistingSession();
+setupInviteRegistrationMode();
+registerVipServiceWorker();
 
 // Close modals on overlay click
 document.getElementById('expense-modal').addEventListener('click', function(e) {
