@@ -1,9 +1,10 @@
-const CACHE_NAME = 'kurs-worker-v1';
+const CACHE_NAME = 'kurs-worker-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './styles.css',
-  './scripts.js',
+  './app/pages/worker/worker.page.css',
+  './app/core/frontend-infra.js',
+  './app/pages/worker/worker.page.js',
   './manifest.webmanifest',
   './icons/worker-icon-192.svg',
   './icons/worker-icon-512.svg'

@@ -93,4 +93,54 @@ button.ghost {
   background: #101726;
 }
 
+.item.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px rgba(73, 166, 255, 0.2);
+}
+
 .item .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+.status-pill {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  background: #101725;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.selected-box {
+  margin-top: 10px;
+  border: 1px solid rgba(73, 166, 255, 0.5);
+  background: rgba(73, 166, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.selected-title {
+  color: #9fd0ff;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.selected-text {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.quick-row {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.quick-row button {
+  margin-top: 0;
+  background: #17233d;
+  color: #bcd7ff;
+  border: 1px solid #2a3f67;
+  font-size: 12px;
+  padding: 9px 8px;
+}

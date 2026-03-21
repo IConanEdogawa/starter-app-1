@@ -1,9 +1,10 @@
-const CACHE_NAME = 'kurs-vip-v1';
+const CACHE_NAME = 'kurs-vip-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css',
-  '/scripts.js',
+  '/app/pages/vip/vip.page.css',
+  '/app/core/frontend-infra.js',
+  '/app/pages/vip/vip.page.js',
   '/manifest.webmanifest',
   '/icons/vip-icon-192.svg',
   '/icons/vip-icon-512.svg'

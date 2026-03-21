@@ -1,8 +1,16 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/worker-app",
+      "destination": "/worker-app/index.html"
+    },
+    {
+      "source": "/worker-app/",
+      "destination": "/worker-app/index.html"
+    },
+    {
+      "source": "/worker",
+      "destination": "/worker-app/index.html"
     }
   ]
 }

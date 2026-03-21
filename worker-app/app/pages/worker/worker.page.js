@@ -1,23 +1,8 @@
-const API_BASE = resolveApiBase();
+const API_BASE = window.KursInfra ? window.KursInfra.resolveApiBase() : 'http://localhost:5075';
 const AUTH_KEY = 'worker_auth';
 const SEEN_NOTIFY_KEY = 'worker_seen_notifications';
 let session = null;
 let swReg = null;
-
-function resolveApiBase() {
-  const fromStorage = (localStorage.getItem('api_base') || '').trim();
-  if (fromStorage) return fromStorage.replace(/\/$/, '');
-
-  const fromMeta = (document.querySelector('meta[name="api-base"]')?.getAttribute('content') || '').trim();
-  if (fromMeta) return fromMeta.replace(/\/$/, '');
-
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return 'http://localhost:5075';
-  }
-
-  return window.location.origin.replace(/\/$/, '');
-}
 
 const authCard = document.getElementById('auth-card');
 const actionCard = document.getElementById('action-card');
@@ -25,6 +10,9 @@ const authMsg = document.getElementById('auth-msg');
 const saveMsg = document.getElementById('save-msg');
 let notificationsTimer = null;
 let seenNotificationIds = new Set();
+let notificationHub = null;
+let selectedNotificationId = null;
+let saveInProgress = false;
 
 try {
   const seenRaw = localStorage.getItem(SEEN_NOTIFY_KEY);
@@ -46,9 +34,11 @@ function setSession(payload) {
   localStorage.setItem(AUTH_KEY, JSON.stringify(payload));
   authCard.style.display = 'none';
   actionCard.style.display = 'block';
+  setConnectionStatus('Online: connecting realtime...');
   loadActions();
   loadNotifications();
   startNotificationsPolling();
+  connectNotificationsRealtime();
 }
 
 function clearSession() {
@@ -56,15 +46,58 @@ function clearSession() {
     clearInterval(notificationsTimer);
     notificationsTimer = null;
   }
+  if (notificationHub) {
+    notificationHub.stop().catch(() => {});
+    notificationHub = null;
+  }
   session = null;
   localStorage.removeItem(AUTH_KEY);
+  selectedNotificationId = null;
   authCard.style.display = 'block';
   actionCard.style.display = 'none';
 }
 
 function startNotificationsPolling() {
   if (notificationsTimer) clearInterval(notificationsTimer);
-  notificationsTimer = setInterval(loadNotifications, 15000);
+  notificationsTimer = setInterval(loadNotifications, 30000);
+}
+
+function setConnectionStatus(text) {
+  const el = document.getElementById('conn-status');
+  if (el) el.textContent = 'Status: ' + text;
+}
+
+async function connectNotificationsRealtime() {
+  if (!window.signalR || !session?.token) return;
+  if (notificationHub && notificationHub.state !== 'Disconnected') return;
+
+  notificationHub = new signalR.HubConnectionBuilder()
+    .withUrl(API_BASE + '/hubs/notifications', {
+      accessTokenFactory: () => session?.token || ''
+    })
+    .withAutomaticReconnect()
+    .build();
+
+  notificationHub.on('notification_created', async item => {
+    if (item?.id && !seenNotificationIds.has(item.id)) {
+      seenNotificationIds.add(item.id);
+      rememberSeenIds();
+      await showBrowserNotification(item);
+    }
+    loadNotifications();
+  });
+
+  notificationHub.on('notification_acknowledged', () => {
+    loadNotifications();
+  });
+
+  try {
+    await notificationHub.start();
+    setConnectionStatus('Realtime connected');
+  } catch {
+    // Fallback to polling only.
+    setConnectionStatus('Polling fallback');
+  }
 }
 
 async function registerWorkerServiceWorker() {
@@ -115,15 +148,20 @@ async function showBrowserNotification(item) {
 }
 
 async function request(path, options = {}) {
+  if (window.KursInfra?.apiRequest) {
+    return window.KursInfra.apiRequest(API_BASE, path, {
+      ...options,
+      token: session?.token
+    });
+  }
+
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (session?.token) headers.Authorization = `Bearer ${session.token}`;
-
   const res = await fetch(API_BASE + path, { ...options, headers });
   const isJson = res.headers.get('content-type')?.includes('application/json');
   const data = isJson ? await res.json() : await res.text();
   if (!res.ok) {
-    const msg = typeof data === 'string' ? data : (data?.title || data?.message || 'Server error');
-    throw new Error(msg);
+    throw new Error(typeof data === 'string' ? data : (data?.title || data?.message || 'Server error'));
   }
   return data;
 }
@@ -155,6 +193,8 @@ async function login() {
 }
 
 async function saveAction() {
+  if (saveInProgress) return;
+
   const actionType = document.getElementById('action-type').value;
   const amount = parseFloat(document.getElementById('amount').value);
   const currency = document.getElementById('currency').value;
@@ -166,6 +206,7 @@ async function saveAction() {
   }
 
   try {
+    saveInProgress = true;
     await request('/api/workercashactions', {
       method: 'POST',
       body: JSON.stringify({ actionType, amount, currency, note, actionAt: new Date().toISOString() })
@@ -176,6 +217,8 @@ async function saveAction() {
     loadActions();
   } catch (e) {
     setMsg(saveMsg, 'Saqlash xato: ' + e.message, 'err');
+  } finally {
+    saveInProgress = false;
   }
 }
 
@@ -210,6 +253,57 @@ async function acknowledgeNotification(id) {
   }
 }
 
+function extractAmountCurrency(message) {
+  if (!message) return { amount: null, currency: null };
+  const m = message.match(/([\d][\d,]*(?:\.\d+)?)\s*(WON|USD)/i);
+  if (!m) return { amount: null, currency: null };
+
+  const amount = parseFloat(m[1].replace(/,/g, ''));
+  const currency = m[2].toLowerCase() === 'won' ? 'won' : 'usd';
+  if (!amount || amount <= 0) return { amount: null, currency: null };
+  return { amount, currency };
+}
+
+function selectNotification(item) {
+  selectedNotificationId = item.id;
+  document.getElementById('selected-notify-box').style.display = 'block';
+  document.getElementById('selected-notify-text').textContent = item.message || item.title || 'Tanlangan';
+
+  const parsed = extractAmountCurrency(item.message || '');
+  if (parsed.amount) {
+    document.getElementById('amount').value = parsed.amount;
+  }
+  if (parsed.currency) {
+    document.getElementById('currency').value = parsed.currency;
+  }
+
+  const noteInput = document.getElementById('note');
+  const prefix = `notify:${item.id}`;
+  if (!noteInput.value.includes(prefix)) {
+    noteInput.value = noteInput.value ? `${noteInput.value} | ${prefix}` : prefix;
+  }
+
+  const all = document.querySelectorAll('#notify-list .item');
+  all.forEach(x => x.classList.remove('active'));
+  const active = document.getElementById('notify-' + item.id);
+  if (active) active.classList.add('active');
+}
+
+function setGiveMode() {
+  document.getElementById('action-type').value = 'give';
+}
+
+function setTakeMode() {
+  document.getElementById('action-type').value = 'take';
+}
+
+function setHalfAmount() {
+  const amountInput = document.getElementById('amount');
+  const current = parseFloat(amountInput.value);
+  if (!current || current <= 0) return;
+  amountInput.value = (current / 2).toFixed(2);
+}
+
 async function loadNotifications() {
   const container = document.getElementById('notify-list');
   if (!container) return;
@@ -226,14 +320,50 @@ async function loadNotifications() {
     rememberSeenIds();
 
     if (!rows.length) {
+      selectedNotificationId = null;
+      document.getElementById('selected-notify-box').style.display = 'none';
       container.innerHTML = '<div class="item">Yangi bildirishnoma yo\'q</div>';
       return;
     }
 
+    const rowsById = new Map(rows.map(r => [r.id, r]));
     container.innerHTML = rows.map(r => {
       const when = new Date(r.createdAt).toLocaleString();
-      return `<div class="item"><strong>${r.title}</strong><div class="meta">${r.message}</div><div class="meta">${when} • ${r.createdByUserName}</div><button onclick="acknowledgeNotification('${r.id}')">Qabul qildim</button></div>`;
+      return `<div class="item" id="notify-${r.id}"><strong>${r.title}</strong><div class="meta">${r.message}</div><div class="meta">${when} • ${r.createdByUserName}</div><div class="quick-row" style="margin-top:8px"><button type="button" class="sel-btn" data-id="${r.id}">Tanlash</button><button type="button" class="ack-btn" data-id="${r.id}">Qabul qildim</button><button type="button" class="half-btn" data-id="${r.id}">Yarmi</button></div></div>`;
     }).join('');
+
+    container.querySelectorAll('.sel-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = rowsById.get(btn.dataset.id);
+        if (row) selectNotification(row);
+      });
+    });
+
+    container.querySelectorAll('.ack-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        acknowledgeNotification(btn.dataset.id);
+      });
+    });
+
+    container.querySelectorAll('.half-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = rowsById.get(btn.dataset.id);
+        if (row) {
+          selectNotification(row);
+          setHalfAmount();
+        }
+      });
+    });
+
+    if (selectedNotificationId) {
+      const selected = rows.find(x => x.id === selectedNotificationId);
+      if (selected) {
+        selectNotification(selected);
+      } else {
+        selectedNotificationId = null;
+        document.getElementById('selected-notify-box').style.display = 'none';
+      }
+    }
   } catch (e) {
     container.innerHTML = `<div class="item">Xato: ${e.message}</div>`;
   }
@@ -254,6 +384,7 @@ async function restore() {
     loadActions();
     loadNotifications();
     startNotificationsPolling();
+    connectNotificationsRealtime();
   } catch {
     clearSession();
   }
@@ -262,6 +393,9 @@ async function restore() {
 document.getElementById('login-btn').addEventListener('click', login);
 document.getElementById('save-btn').addEventListener('click', saveAction);
 document.getElementById('logout-btn').addEventListener('click', clearSession);
+document.getElementById('set-give-btn').addEventListener('click', setGiveMode);
+document.getElementById('set-take-btn').addEventListener('click', setTakeMode);
+document.getElementById('set-half-btn').addEventListener('click', setHalfAmount);
 
 registerWorkerServiceWorker();
 askNotificationPermissionIfNeeded();

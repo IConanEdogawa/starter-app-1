@@ -8,7 +8,7 @@
   <title>Worker Cash App</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/worker-icon-192.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="app/pages/worker/worker.page.css">
 </head>
 <body>
   <main class="container">
@@ -29,8 +29,17 @@
         <button id="logout-btn" class="ghost">Chiqish</button>
       </div>
 
-      <h3 style="margin-top:14px">Yangi bildirishnomalar</h3>
+      <div id="conn-status" class="status-pill">Status: ulanish tekshirilmoqda...</div>
+
+      <h3 style="margin-top:14px">1) Yangi bildirishnomalar</h3>
       <div id="notify-list" class="list"></div>
+
+      <div class="selected-box" id="selected-notify-box" style="display:none">
+        <div class="selected-title">Tanlangan bildirishnoma</div>
+        <div id="selected-notify-text" class="selected-text"></div>
+      </div>
+
+      <h3 style="margin-top:14px">2) Pul harakatini kiriting</h3>
 
       <label>Action turi</label>
       <select id="action-type">
@@ -50,6 +59,12 @@
       <label>Izoh</label>
       <input id="note" type="text" placeholder="ixtiyoriy">
 
+      <div class="quick-row">
+        <button id="set-give-btn" type="button">Set GIVE</button>
+        <button id="set-take-btn" type="button">Set TAKE</button>
+        <button id="set-half-btn" type="button">Half</button>
+      </div>
+
       <button id="save-btn">Saqlash</button>
       <div id="save-msg" class="msg"></div>
 
@@ -58,6 +73,8 @@
     </section>
   </main>
 
-  <script src="scripts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <script src="app/core/frontend-infra.js"></script>
+  <script src="app/pages/worker/worker.page.js"></script>
 </body>
 </html>

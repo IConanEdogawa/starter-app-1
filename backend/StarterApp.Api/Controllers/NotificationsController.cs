@@ -2,8 +2,10 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using StarterApp.Api.Contracts.Notifications;
 using StarterApp.Api.Data;
+using StarterApp.Api.Hubs;
 using StarterApp.Api.Models;
 
 namespace StarterApp.Api.Controllers;
@@ -11,7 +13,7 @@ namespace StarterApp.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "Worker,VIP,Developer")]
-public sealed class NotificationsController(AppDbContext db) : ControllerBase
+public sealed class NotificationsController(AppDbContext db, IHubContext<NotificationsHub> hubContext) : ControllerBase
 {
     [HttpPost]
     [Authorize(Roles = "VIP,Developer")]
@@ -29,11 +31,8 @@ public sealed class NotificationsController(AppDbContext db) : ControllerBase
             return Unauthorized("Invalid user id in token.");
         }
 
-        var targetRole = string.IsNullOrWhiteSpace(request.TargetRole)
-            ? "Worker"
-            : request.TargetRole.Trim();
-
-        if (!new[] { "Worker", "VIP", "Developer" }.Contains(targetRole, StringComparer.OrdinalIgnoreCase))
+        var targetRole = NormalizeRoleOrEmpty(request.TargetRole);
+        if (string.IsNullOrEmpty(targetRole))
         {
             return BadRequest("TargetRole must be Worker, VIP, or Developer.");
         }
@@ -53,7 +52,11 @@ public sealed class NotificationsController(AppDbContext db) : ControllerBase
         db.Notifications.Add(entity);
         await db.SaveChangesAsync();
 
-        return Ok(ToResponse(entity));
+        var response = ToResponse(entity);
+        await hubContext.Clients.Group($"role:{targetRole.ToLowerInvariant()}")
+            .SendAsync("notification_created", response);
+
+        return Ok(response);
     }
 
     [HttpGet("inbox")]
@@ -100,6 +103,14 @@ public sealed class NotificationsController(AppDbContext db) : ControllerBase
             entity.AcknowledgedByUserId = userId;
             entity.AcknowledgedByUserName = User.Identity?.Name ?? "unknown";
             await db.SaveChangesAsync();
+
+            var updated = ToResponse(entity);
+            await hubContext.Clients.Group($"role:{entity.TargetRole.ToLowerInvariant()}")
+                .SendAsync("notification_acknowledged", updated);
+            await hubContext.Clients.Group("role:vip")
+                .SendAsync("notification_acknowledged", updated);
+            await hubContext.Clients.Group("role:developer")
+                .SendAsync("notification_acknowledged", updated);
         }
 
         return Ok(ToResponse(entity));
@@ -118,4 +129,16 @@ public sealed class NotificationsController(AppDbContext db) : ControllerBase
         x.AcknowledgedByUserName,
         x.CreatedAt
     );
+
+    private static string NormalizeRoleOrEmpty(string? role)
+    {
+        var r = (role ?? "Worker").Trim().ToLowerInvariant();
+        return r switch
+        {
+            "worker" => "Worker",
+            "vip" => "VIP",
+            "developer" => "Developer",
+            _ => string.Empty
+        };
+    }
 }

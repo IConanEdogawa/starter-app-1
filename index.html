@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="app/pages/vip/vip.page.css">
 </head>
 <body>
 
@@ -84,6 +84,10 @@
     <button class="nav-btn" onclick="switchPage('invite')" id="nav-invite">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12h16"/><path d="M12 4v16"/><path d="M6 6h12v12H6z"/></svg>
       INVITE W
+    </button>
+    <button class="nav-btn" onclick="switchPage('developer')" id="nav-developer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7z"/></svg>
+      DEV
     </button>
   </nav>
 
@@ -306,6 +310,35 @@
     </div>
   </div>
 
+  <!-- PAGE: DEVELOPER -->
+  <div class="page" id="page-developer">
+    <div class="page-header">
+      <div>
+        <div class="page-title">DEVELOPER</div>
+        <div class="page-sub">System overview va servis amallar</div>
+      </div>
+    </div>
+    <div class="page-scroll">
+      <div class="card">
+        <div class="card-title">SISTEMA HOLATI</div>
+        <div id="dev-status" style="font-size:13px;color:var(--text2)">Yuklanmoqda...</div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Users</div><div class="stat-value" id="dev-users-total">0</div><div class="stat-sub" id="dev-users-by-role">W:0 V:0 D:0</div></div>
+        <div class="stat-card"><div class="stat-label">Invites</div><div class="stat-value" id="dev-invites-total">0</div><div class="stat-sub" id="dev-invites-meta">Used:0 Exp:0</div></div>
+        <div class="stat-card"><div class="stat-label">Notify</div><div class="stat-value" id="dev-notify-total">0</div><div class="stat-sub" id="dev-notify-unacked">Unacked:0</div></div>
+        <div class="stat-card"><div class="stat-label">Worker Actions</div><div class="stat-value" id="dev-worker-actions">0</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">ACTIONS</div>
+        <button class="btn btn-primary" onclick="refreshDeveloperOverview()" style="margin-bottom:8px">Refresh overview</button>
+        <button class="btn btn-ghost" onclick="cleanupExpiredInvites()">Cleanup expired invites</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- NEW CUSTOMER MODAL -->
@@ -430,7 +463,8 @@
 <!-- TOAST -->
 <div id="toast"></div>
 
-<script src="scripts.js"></script>
+<script src="app/core/frontend-infra.js"></script>
+<script src="app/pages/vip/vip.page.js"></script>
 </body>
 </html>
 

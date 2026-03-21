@@ -1,22 +1,7 @@
 // ===== DATA STORE =====
 const AUTH_KEY = 'kurs_auth';
-const API_BASE = resolveApiBase();
+const API_BASE = window.KursInfra ? window.KursInfra.resolveApiBase() : 'http://localhost:5075';
 const inviteToken = new URLSearchParams(window.location.search).get('invite');
-
-function resolveApiBase() {
-  const fromStorage = (localStorage.getItem('api_base') || '').trim();
-  if (fromStorage) return fromStorage.replace(/\/$/, '');
-
-  const fromMeta = (document.querySelector('meta[name="api-base"]')?.getAttribute('content') || '').trim();
-  if (fromMeta) return fromMeta.replace(/\/$/, '');
-
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return 'http://localhost:5075';
-  }
-
-  return window.location.origin.replace(/\/$/, '');
-}
 
 let DB = {
   customers: [],
@@ -57,6 +42,7 @@ function switchPage(p) {
   if (p === 'analytics') { setTimeout(initAnalytics, 50); }
   if (p === 'expenses') { renderExpenses(); }
   if (p === 'profits') { renderProfits(); }
+  if (p === 'developer') { refreshDeveloperOverview(); }
 }
 
 function canAccessPage(pageName) {
@@ -74,7 +60,8 @@ function applyRoleUi() {
     analytics: document.getElementById('nav-analytics'),
     expenses: document.getElementById('nav-expenses'),
     profits: document.getElementById('nav-profits'),
-    invite: document.getElementById('nav-invite')
+    invite: document.getElementById('nav-invite'),
+    developer: document.getElementById('nav-developer')
   };
 
   if (role === 'worker') {
@@ -82,6 +69,7 @@ function applyRoleUi() {
     navMap.expenses.style.display = 'none';
     navMap.profits.style.display = 'none';
     navMap.invite.style.display = 'none';
+    navMap.developer.style.display = 'none';
     switchPage('txn');
     return;
   }
@@ -90,6 +78,15 @@ function applyRoleUi() {
   navMap.expenses.style.display = '';
   navMap.profits.style.display = '';
   navMap.invite.style.display = '';
+
+  if (role === 'developer') {
+    navMap.developer.style.display = '';
+  } else {
+    navMap.developer.style.display = 'none';
+    if (document.getElementById('page-developer').classList.contains('active')) {
+      switchPage('txn');
+    }
+  }
 }
 
 function switchAuthTab(tab) {
@@ -156,28 +153,30 @@ function showAppShell() {
 }
 
 async function apiRequest(path, options = {}) {
-  const headers = {
+  if (window.KursInfra?.apiRequest) {
+    return window.KursInfra.apiRequest(API_BASE, path, {
+      ...options,
+      token: authSession?.token
+    });
+  }
+
+  const fallbackHeaders = {
     'Content-Type': 'application/json',
     ...(options.headers || {})
   };
 
   if (authSession?.token) {
-    headers.Authorization = `Bearer ${authSession.token}`;
+    fallbackHeaders.Authorization = `Bearer ${authSession.token}`;
   }
 
   const response = await fetch(API_BASE + path, {
     ...options,
-    headers
+    headers: fallbackHeaders
   });
-
-  let body = null;
   const isJson = response.headers.get('content-type')?.includes('application/json');
-  if (isJson) body = await response.json();
-  else body = await response.text();
-
+  const body = isJson ? await response.json() : await response.text();
   if (!response.ok) {
-    const message = typeof body === 'string' ? body : (body?.title || body?.message || 'Server error');
-    throw new Error(message);
+    throw new Error(typeof body === 'string' ? body : (body?.title || body?.message || 'Server error'));
   }
   return body;
 }
@@ -339,6 +338,41 @@ async function copyWorkerInviteLink() {
     showToast('Link nusxalandi', 'success');
   } catch {
     showToast('Nusxalashda xato', 'error');
+  }
+}
+
+async function refreshDeveloperOverview() {
+  if (!authSession || (authSession.role || '').toLowerCase() !== 'developer') {
+    return;
+  }
+
+  try {
+    const data = await apiRequest('/api/developer/overview');
+    document.getElementById('dev-status').textContent = `DB: ${data.dbConnected ? 'connected' : 'disconnected'} · UTC: ${new Date(data.serverTimeUtc).toLocaleString()}`;
+    document.getElementById('dev-users-total').textContent = data.users.total;
+    document.getElementById('dev-users-by-role').textContent = `W:${data.users.workers} V:${data.users.vips} D:${data.users.developers}`;
+    document.getElementById('dev-invites-total').textContent = data.invites.total;
+    document.getElementById('dev-invites-meta').textContent = `Used:${data.invites.used} Exp:${data.invites.expired}`;
+    document.getElementById('dev-notify-total').textContent = data.notifications.total;
+    document.getElementById('dev-notify-unacked').textContent = `Unacked:${data.notifications.unacked}`;
+    document.getElementById('dev-worker-actions').textContent = data.workerCashActions.total;
+  } catch (e) {
+    document.getElementById('dev-status').textContent = 'Developer overview xato: ' + e.message;
+  }
+}
+
+async function cleanupExpiredInvites() {
+  if (!authSession || (authSession.role || '').toLowerCase() !== 'developer') {
+    showToast('Faqat developer uchun', 'error');
+    return;
+  }
+
+  try {
+    const res = await apiRequest('/api/developer/invites/cleanup', { method: 'POST' });
+    showToast(`Cleanup done: ${res.deleted} ta`, 'success');
+    refreshDeveloperOverview();
+  } catch (e) {
+    showToast('Cleanup xato: ' + e.message, 'error');
   }
 }
 
