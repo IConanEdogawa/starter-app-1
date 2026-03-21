@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worker Cash App</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="container">
+    <section class="card" id="auth-card">
+      <h1>WORKER APP</h1>
+      <p class="sub">Kirish qiling va pul berdi/oldi yozing</p>
+      <label>Username</label>
+      <input id="username" type="text" placeholder="worker01">
+      <label>Parol</label>
+      <input id="password" type="password" placeholder="******">
+      <button id="login-btn">Kirish</button>
+      <div id="auth-msg" class="msg"></div>
+    </section>
+
+    <section class="card" id="action-card" style="display:none">
+      <div class="top-row">
+        <h2>Pul Harakati</h2>
+        <button id="logout-btn" class="ghost">Chiqish</button>
+      </div>
+
+      <label>Action turi</label>
+      <select id="action-type">
+        <option value="give">Pul berdi</option>
+        <option value="take">Pul oldi</option>
+      </select>
+
+      <label>Miqdor</label>
+      <input id="amount" type="number" placeholder="0">
+
+      <label>Valyuta</label>
+      <select id="currency">
+        <option value="won">WON</option>
+        <option value="usd">USD</option>
+      </select>
+
+      <label>Izoh</label>
+      <input id="note" type="text" placeholder="ixtiyoriy">
+
+      <button id="save-btn">Saqlash</button>
+      <div id="save-msg" class="msg"></div>
+
+      <h3>Oxirgi yozuvlar</h3>
+      <div id="list" class="list"></div>
+    </section>
+  </main>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

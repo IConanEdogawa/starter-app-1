@@ -11,449 +11,61 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<style>
-:root {
-  --bg: #07070d;
-  --bg2: #0f0f1a;
-  --bg3: #161624;
-  --surface: #1a1a2e;
-  --surface2: #22223a;
-  --border: #2a2a45;
-  --accent: #f0c040;
-  --accent2: #e06030;
-  --green: #30e09a;
-  --red: #e04060;
-  --blue: #4090f0;
-  --text: #f0f0f8;
-  --text2: #9090b8;
-  --text3: #555575;
-  --radius: 14px;
-  --won: #f0c040;
-  --usd: #30e09a;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; }
-
-/* SCROLLBAR */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-/* APP SHELL */
-#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-
-/* NAV */
-nav {
-  display: flex; gap: 0;
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  position: relative; z-index: 10;
-  flex-shrink: 0;
-}
-.nav-btn {
-  flex: 1; padding: 14px 8px; border: none; background: transparent;
-  color: var(--text3); font-family: 'Space Mono', monospace; font-size: 11px;
-  letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
-  transition: all .2s; position: relative; display: flex; flex-direction: column;
-  align-items: center; gap: 5px;
-}
-.nav-btn svg { width: 20px; height: 20px; stroke-width: 1.5; }
-.nav-btn.active { color: var(--accent); }
-.nav-btn.active::after {
-  content: ''; position: absolute; bottom: 0; left: 20%; right: 20%;
-  height: 2px; background: var(--accent); border-radius: 2px 2px 0 0;
-}
-
-/* PAGES */
-.page { display: none; flex: 1; overflow: hidden; flex-direction: column; }
-.page.active { display: flex; }
-.page-scroll { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 24px; }
-
-/* HEADER STRIP */
-.page-header {
-  padding: 16px 16px 0;
-  display: flex; align-items: center; justify-content: space-between;
-  flex-shrink: 0;
-}
-.page-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 28px; letter-spacing: 3px; color: var(--text);
-}
-.page-sub { font-size: 11px; color: var(--text3); letter-spacing: 1px; margin-top: 2px; }
-
-/* CARDS */
-.card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px; margin-bottom: 12px;
-}
-.card-title {
-  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
-  color: var(--text3); margin-bottom: 12px; font-family: 'Space Mono', monospace;
-}
-
-/* INPUTS */
-.input-group { margin-bottom: 10px; }
-.input-label { font-size: 10px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; display: block; }
-.input-wrap { position: relative; }
-input[type=text], input[type=number], input[type=datetime-local], textarea {
-  width: 100%; padding: 12px 14px;
-  background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 10px; color: var(--text); font-size: 15px;
-  font-family: 'IBM Plex Sans', sans-serif; outline: none;
-  transition: border-color .2s;
-  -webkit-appearance: none;
-}
-input:focus, textarea:focus { border-color: var(--accent); }
-input::placeholder, textarea::placeholder { color: var(--text3); }
-textarea { resize: none; min-height: 70px; }
-
-.input-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; }
-
-/* SEARCH DROPDOWN */
-.search-results {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; z-index: 100; overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,.5);
-}
-.search-item {
-  padding: 12px 14px; cursor: pointer; transition: background .15s;
-  display: flex; align-items: center; gap: 10px;
-  border-bottom: 1px solid var(--border);
-}
-.search-item:last-child { border-bottom: none; }
-.search-item:hover, .search-item:active { background: var(--surface2); }
-.search-item .avatar {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: var(--border); display: flex; align-items: center;
-  justify-content: center; font-size: 13px; font-weight: 600;
-  color: var(--accent); flex-shrink: 0;
-}
-.search-item .info { flex: 1; min-width: 0; }
-.search-item .name { font-size: 14px; font-weight: 500; }
-.search-item .phone { font-size: 11px; color: var(--text3); font-family: 'Space Mono', monospace; }
-
-/* NEW CUSTOMER WARNING */
-.warn-banner {
-  background: rgba(240,192,64,.1); border: 1px solid rgba(240,192,64,.3);
-  border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
-  display: flex; align-items: center; gap: 10px;
-  animation: fadeIn .2s ease;
-}
-.warn-banner svg { flex-shrink: 0; color: var(--accent); }
-.warn-banner .warn-text { flex: 1; font-size: 13px; color: var(--accent); line-height: 1.4; }
-.warn-actions { display: flex; gap: 8px; margin-top: 8px; }
-
-/* SELECTED CUSTOMER CHIP */
-.customer-chip {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(240,192,64,.08); border: 1px solid rgba(240,192,64,.25);
-  border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;
-  animation: fadeIn .2s ease;
-}
-.customer-chip .avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: rgba(240,192,64,.15); display: flex; align-items: center;
-  justify-content: center; font-weight: 700; color: var(--accent);
-  font-size: 15px; flex-shrink: 0;
-}
-.customer-chip .info { flex: 1; }
-.customer-chip .cname { font-weight: 600; font-size: 15px; }
-.customer-chip .cphone { font-size: 11px; color: var(--text3); font-family: 'Space Mono', monospace; }
-.chip-clear { background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px; }
-
-/* TYPE TOGGLE */
-.type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-.type-btn {
-  padding: 12px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--bg3); color: var(--text2); cursor: pointer;
-  text-align: center; transition: all .2s; font-size: 13px; font-weight: 500;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-}
-.type-btn .type-icon { font-size: 20px; }
-.type-btn.active-won { background: rgba(240,192,64,.12); border-color: var(--won); color: var(--won); }
-.type-btn.active-usd { background: rgba(48,224,154,.12); border-color: var(--usd); color: var(--usd); }
-
-/* AMOUNT ROW */
-.amount-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-
-/* BUTTONS */
-.btn {
-  width: 100%; padding: 14px; border: none; border-radius: 10px;
-  font-size: 15px; font-weight: 600; cursor: pointer; transition: all .15s;
-  font-family: 'IBM Plex Sans', sans-serif; letter-spacing: .5px;
-}
-.btn-primary { background: var(--accent); color: #000; }
-.btn-primary:active { transform: scale(.98); background: #d4a830; }
-.btn-secondary { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
-.btn-secondary:active { transform: scale(.98); }
-.btn-sm { width: auto; padding: 7px 14px; font-size: 12px; border-radius: 8px; }
-.btn-ghost { background: none; border: 1px solid var(--border); color: var(--text2); }
-.btn-danger { background: rgba(224,64,96,.15); color: var(--red); border: 1px solid rgba(224,64,96,.3); }
-
-/* OPEN TRANS LIST */
-.open-trans-list { display: flex; flex-direction: column; gap: 6px; }
-.open-trans-item {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 10px; padding: 10px 12px; cursor: pointer;
-  transition: border-color .2s;
-}
-.open-trans-item:hover { border-color: var(--accent); }
-.open-trans-item.selected { border-color: var(--accent); background: rgba(240,192,64,.06); }
-.ot-type { font-size: 11px; font-family: 'Space Mono', monospace; }
-.ot-won { color: var(--won); }
-.ot-usd { color: var(--usd); }
-.ot-customer { font-size: 13px; font-weight: 500; flex: 1; }
-.ot-amount { font-size: 12px; color: var(--text2); font-family: 'Space Mono', monospace; }
-.ot-date { font-size: 10px; color: var(--text3); }
-
-/* PROFIT PREVIEW */
-.profit-preview {
-  display: flex; justify-content: space-between; align-items: center;
-  background: rgba(48,224,154,.08); border: 1px solid rgba(48,224,154,.2);
-  border-radius: 10px; padding: 12px 14px; margin-top: 10px;
-  animation: fadeIn .2s ease;
-}
-.profit-preview.loss { background: rgba(224,64,96,.08); border-color: rgba(224,64,96,.2); }
-.profit-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
-.profit-value { font-size: 20px; font-family: 'Space Mono', monospace; font-weight: 700; color: var(--green); }
-.profit-preview.loss .profit-value { color: var(--red); }
-
-/* SMART INPUT */
-.smart-input-area { position: relative; }
-.smart-input-area textarea { font-size: 14px; line-height: 1.6; }
-.smart-hints {
-  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
-}
-.hint-chip {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 20px; padding: 4px 10px; font-size: 11px;
-  color: var(--text3); cursor: pointer; transition: all .15s;
-}
-.hint-chip:hover { border-color: var(--accent); color: var(--accent); }
-
-/* STATS CARDS */
-.stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-.stat-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 14px;
-}
-.stat-label { font-size: 10px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
-.stat-value { font-size: 20px; font-family: 'Space Mono', monospace; font-weight: 700; }
-.stat-value.green { color: var(--green); }
-.stat-value.red { color: var(--red); }
-.stat-value.won { color: var(--won); }
-.stat-value.usd { color: var(--usd); }
-.stat-sub { font-size: 10px; color: var(--text3); margin-top: 3px; }
-
-/* 3D CHART */
-#chart-container {
-  width: 100%; height: 220px; position: relative;
-  border-radius: var(--radius); overflow: hidden;
-  background: var(--bg3); border: 1px solid var(--border);
-  margin-bottom: 12px;
-}
-#chart-canvas { width: 100% !important; height: 100% !important; }
-.chart-legend {
-  display: flex; gap: 10px; flex-wrap: wrap;
-  padding: 14px 16px; background: var(--bg3);
-  border: 1px solid var(--border); border-radius: 12px;
-  margin-bottom: 12px;
-}
-.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
-.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-/* CUSTOMER LIST */
-.analytics-layout { display: flex; flex-direction: column; gap: 12px; flex: 1; overflow: hidden; }
-.customers-scroll {
-  height: 180px; overflow-y: auto;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius); flex-shrink: 0;
-}
-.customer-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 14px; border-bottom: 1px solid var(--border);
-  cursor: pointer; transition: background .15s;
-}
-.customer-row:last-child { border-bottom: none; }
-.customer-row:hover, .customer-row.active { background: rgba(240,192,64,.06); }
-.customer-row.active { border-left: 2px solid var(--accent); }
-.cr-avatar {
-  width: 34px; height: 34px; border-radius: 50%;
-  background: var(--surface2); display: flex; align-items: center;
-  justify-content: center; font-weight: 700; font-size: 13px;
-  color: var(--accent); flex-shrink: 0;
-}
-.cr-name { font-size: 14px; font-weight: 500; flex: 1; }
-.cr-count { font-size: 10px; color: var(--text3); font-family: 'Space Mono', monospace; }
-.cr-badge {
-  font-size: 11px; padding: 2px 8px; border-radius: 20px;
-  background: rgba(48,224,154,.12); color: var(--green);
-  font-family: 'Space Mono', monospace;
-}
-.cr-badge.neg { background: rgba(224,64,96,.12); color: var(--red); }
-
-/* CUSTOMER DETAIL */
-.customer-detail {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px;
-  flex: 1; overflow-y: auto;
-}
-.detail-name {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 24px; letter-spacing: 2px; margin-bottom: 4px;
-}
-.detail-phone { font-size: 12px; color: var(--text3); font-family: 'Space Mono', monospace; margin-bottom: 14px; }
-.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.detail-item {
-  background: var(--bg3); border-radius: 10px; padding: 12px;
-  border: 1px solid var(--border);
-}
-.detail-item .dl { font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
-.detail-item .dv { font-size: 16px; font-family: 'Space Mono', monospace; font-weight: 700; }
-
-/* TRANS HISTORY */
-.trans-history { margin-top: 14px; }
-.th-title { font-size: 10px; color: var(--text3); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; font-family: 'Space Mono', monospace; }
-.trans-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 0; border-bottom: 1px solid var(--border);
-}
-.trans-item:last-child { border-bottom: none; }
-.trans-icon {
-  width: 32px; height: 32px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center; font-size: 14px;
-  flex-shrink: 0;
-}
-.ti-won { background: rgba(240,192,64,.12); }
-.ti-usd { background: rgba(48,224,154,.12); }
-.trans-info { flex: 1; }
-.trans-main { font-size: 13px; font-weight: 500; }
-.trans-date { font-size: 10px; color: var(--text3); font-family: 'Space Mono', monospace; }
-.trans-profit { font-size: 13px; font-family: 'Space Mono', monospace; font-weight: 700; }
-.trans-profit.open { color: var(--text3); font-size: 11px; }
-
-/* RASXOD TAB */
-.expense-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 0; border-bottom: 1px solid var(--border);
-}
-.expense-item:last-child { border-bottom: none; }
-.ex-icon {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: rgba(224,96,48,.12); display: flex; align-items: center;
-  justify-content: center; font-size: 16px; flex-shrink: 0;
-}
-.ex-info { flex: 1; }
-.ex-desc { font-size: 14px; font-weight: 500; }
-.ex-date { font-size: 11px; color: var(--text3); font-family: 'Space Mono', monospace; }
-.ex-amount { font-size: 15px; font-family: 'Space Mono', monospace; color: var(--red); font-weight: 700; }
-
-/* TABS inside page */
-.inner-tabs { display: flex; gap: 4px; margin-bottom: 14px; }
-.itab {
-  padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
-  background: none; color: var(--text3); font-size: 12px; cursor: pointer;
-  font-family: 'Space Mono', monospace; letter-spacing: .5px; transition: all .15s;
-}
-.itab.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
-
-/* TOAST */
-#toast {
-  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 10px 18px; font-size: 13px;
-  opacity: 0; transition: all .3s; pointer-events: none; z-index: 999;
-  white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.4);
-}
-#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-#toast.success { border-color: rgba(48,224,154,.4); color: var(--green); }
-#toast.error { border-color: rgba(224,64,96,.4); color: var(--red); }
-
-/* MODAL */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.7);
-  z-index: 200; display: flex; align-items: flex-end; justify-content: center;
-  opacity: 0; pointer-events: none; transition: opacity .2s;
-}
-.modal-overlay.open { opacity: 1; pointer-events: all; }
-.modal {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 20px 20px 0 0; padding: 20px; width: 100%; max-width: 500px;
-  transform: translateY(100%); transition: transform .3s cubic-bezier(.32,0,.67,0);
-  max-height: 80vh; overflow-y: auto;
-}
-.modal-overlay.open .modal { transform: translateY(0); }
-.modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; margin-bottom: 16px; }
-.modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
-
-/* EXPENSE FORM ROW */
-.expense-form { display: flex; flex-direction: column; gap: 10px; }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-
-/* ANIMATIONS */
-@keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.fade-in { animation: fadeIn .25s ease; }
-.slide-up { animation: slideUp .25s ease; }
-
-/* EMPTY STATE */
-.empty-state {
-  text-align: center; padding: 32px 16px; color: var(--text3);
-}
-.empty-state .es-icon { font-size: 36px; margin-bottom: 10px; opacity: .5; }
-.empty-state .es-text { font-size: 13px; line-height: 1.6; }
-
-/* SECTION DIVIDER */
-.section-divider {
-  display: flex; align-items: center; gap: 10px; margin: 14px 0 10px;
-}
-.section-divider span {
-  font-size: 10px; color: var(--text3); letter-spacing: 2px;
-  text-transform: uppercase; white-space: nowrap; font-family: 'Space Mono', monospace;
-}
-.section-divider::before, .section-divider::after {
-  content: ''; flex: 1; height: 1px; background: var(--border);
-}
-
-/* DATETIME */
-input[type="datetime-local"] { color-scheme: dark; }
-
-/* OPEN INDICATOR */
-.open-badge {
-  font-size: 9px; padding: 2px 6px; border-radius: 4px;
-  background: rgba(64,144,240,.15); color: var(--blue);
-  border: 1px solid rgba(64,144,240,.3); font-family: 'Space Mono', monospace;
-  letter-spacing: .5px;
-}
-
-/* NO CUSTOMER SELECTED */
-.no-selection {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 200px; color: var(--text3); text-align: center;
-}
-.no-selection .ns-icon { font-size: 40px; margin-bottom: 10px; opacity: .3; }
-.no-selection .ns-text { font-size: 13px; }
-
-/* PULSE DOT */
-.pulse-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
-  display: inline-block; margin-right: 6px; position: relative;
-}
-.pulse-dot::after {
-  content: ''; position: absolute; inset: -3px; border-radius: 50%;
-  border: 1px solid var(--green); animation: pulse 1.5s infinite; opacity: 0;
-}
-@keyframes pulse { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(2); opacity: 0; } }
-</style>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">KURS</div>
+    <div class="auth-sub">VIP / Worker kirish</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="auth-tab-login" onclick="switchAuthTab('login')">KIRISH</button>
+      <button class="auth-tab" id="auth-tab-register" onclick="switchAuthTab('register')">RO'YXATDAN O'TISH</button>
+    </div>
+
+    <div id="auth-login-panel">
+      <div class="input-group">
+        <label class="input-label">Username</label>
+        <input type="text" id="login-username" placeholder="username">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Parol</label>
+        <input type="password" id="login-password" placeholder="******">
+      </div>
+      <button class="btn btn-primary" onclick="loginUser()">Kirish</button>
+    </div>
+
+    <div id="auth-register-panel" style="display:none">
+      <div class="input-group">
+        <label class="input-label">Username</label>
+        <input type="text" id="register-username" placeholder="yangi username">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Parol</label>
+        <input type="password" id="register-password" placeholder="kamida 6 ta belgi">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Role</label>
+        <select id="register-role" style="width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;outline:none;-webkit-appearance:none;appearance:none;font-family:inherit">
+          <option value="Worker">Worker</option>
+          <option value="VIP">VIP</option>
+          <option value="Developer">Developer</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="registerUser()">Ro'yxatdan o'tish</button>
+    </div>
+
+    <div class="auth-hint">API: <span id="auth-api-url">http://localhost:5075</span></div>
+  </div>
+</div>
+
 <div id="app">
+  <div id="session-bar" class="session-bar" style="display:none">
+    <div id="session-user" class="session-user">USER</div>
+    <button class="btn btn-sm btn-secondary" onclick="logoutUser()" style="width:auto">Chiqish</button>
+  </div>
   <!-- NAV -->
   <nav>
     <button class="nav-btn active" onclick="switchPage('txn')" id="nav-txn">
@@ -468,30 +80,15 @@ input[type="datetime-local"] { color-scheme: dark; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
       RASXOD
     </button>
+    <button class="nav-btn" onclick="switchPage('profits')" id="nav-profits">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+      FOYDA
+    </button>
   </nav>
 
   <!-- PAGE: TRANSACTION -->
   <div class="page active" id="page-txn">
     <div class="page-scroll" id="txn-scroll">
-
-      <!-- Smart Input -->
-      <div class="card" style="border-color: rgba(240,192,64,.2); background: rgba(240,192,64,.04);">
-        <div class="card-title" style="color: var(--accent);">
-          <span class="pulse-dot"></span>AQLLI KIRITISH
-        </div>
-        <div class="smart-input-area">
-          <textarea id="smart-input" placeholder="Masalan: Alisher 1000 won kurs 1350 sotdi&#10;yoki: Kim 500 dollar 1350 da oldi"></textarea>
-        </div>
-        <div class="smart-hints">
-          <span class="hint-chip" onclick="fillSmart('1000 won kurs 1350')">1000 WON</span>
-          <span class="hint-chip" onclick="fillSmart('500 dollar kurs 1340')">500 USD</span>
-          <span class="hint-chip" onclick="fillSmart('2000000 won kurs 1355 oldi')">Oldi</span>
-          <span class="hint-chip" onclick="fillSmart('200 dollar kurs 1345 sotdi')">Sotdi</span>
-        </div>
-        <button class="btn btn-secondary" style="margin-top:10px" onclick="parseSmartInput()">
-          ✦ Tahlil qilish
-        </button>
-      </div>
 
       <!-- Customer Search -->
       <div class="card">
@@ -541,14 +138,11 @@ input[type="datetime-local"] { color-scheme: dark; }
           <label class="input-label">Izoh (ixtiyoriy)</label>
           <input type="text" id="note-input" placeholder="...">
         </div>
-      </div>
 
-      <!-- Open transactions to link -->
-      <div class="card" id="open-trans-card" style="display:none">
-        <div class="card-title">OCHIQ TRANZAKSIYANI YOPING</div>
-        <p style="font-size:12px; color:var(--text3); margin-bottom:10px;">Foyda hisoblash uchun juftlang:</p>
-        <div class="open-trans-list" id="open-trans-list"></div>
-        <div id="profit-preview"></div>
+        <div class="input-group" style="margin-top:10px;margin-bottom:0">
+          <label class="input-label" id="converted-label">Hisoblangan USD</label>
+          <input type="text" id="converted-output" readonly placeholder="0">
+        </div>
       </div>
 
       <!-- Datetime -->
@@ -653,6 +247,34 @@ input[type="datetime-local"] { color-scheme: dark; }
     </div>
   </div>
 
+  <!-- PAGE: PROFITS -->
+  <div class="page" id="page-profits">
+    <div class="page-header">
+      <div>
+        <div class="page-title">FOYDA</div>
+        <div class="page-sub">Foyda hisobi</div>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="openProfitModal()" style="width:auto">+ Qo'shish</button>
+    </div>
+    <div class="page-scroll">
+      <div class="inner-tabs" style="margin-top:4px">
+        <button class="itab active" onclick="switchProfitTab('list')" id="ptab-list">ROYXAT</button>
+        <button class="itab" onclick="switchProfitTab('summary')" id="ptab-summary">XULOSA</button>
+      </div>
+
+      <div id="profit-tab-list">
+        <div id="profit-list"></div>
+      </div>
+      <div id="profit-tab-summary" style="display:none">
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-label">Jami (WON)</div><div class="stat-value green" id="profit-total-won">0 ₩</div></div>
+          <div class="stat-card"><div class="stat-label">Jami (USD)</div><div class="stat-value green" id="profit-total-usd">0 $</div></div>
+        </div>
+        <div id="profit-by-category"></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- NEW CUSTOMER MODAL -->
@@ -717,7 +339,7 @@ input[type="datetime-local"] { color-scheme: dark; }
         </div>
         <div class="input-group">
           <label class="input-label">Valyuta</label>
-          <select id="exp-currency" style="width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;outline:none;-webkit-appearance:none;font-family:inherit">
+          <select id="exp-currency" style="width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;outline:none;-webkit-appearance:none;appearance:none;font-family:inherit">
             <option value="won">WON ₩</option>
             <option value="usd">USD $</option>
           </select>
@@ -737,951 +359,47 @@ input[type="datetime-local"] { color-scheme: dark; }
   </div>
 </div>
 
+<!-- PROFIT MODAL -->
+<div class="modal-overlay" id="profit-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">YANGI FOYDA</div>
+    <div class="expense-form">
+      <div class="input-group">
+        <label class="input-label">Tavsif</label>
+        <input type="text" id="profit-desc" placeholder="Savdo foydasi...">
+      </div>
+      <div class="two-col">
+        <div class="input-group">
+          <label class="input-label">Miqdor</label>
+          <input type="number" id="profit-amount" placeholder="0" inputmode="decimal">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Valyuta</label>
+          <select id="profit-currency" style="width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;outline:none;-webkit-appearance:none;appearance:none;font-family:inherit">
+            <option value="won">WON ₩</option>
+            <option value="usd">USD $</option>
+          </select>
+        </div>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Kategoriya</label>
+        <input type="text" id="profit-cat" placeholder="Savdo, Komissiya...">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Sana</label>
+        <input type="datetime-local" id="profit-date">
+      </div>
+      <button class="btn btn-primary" onclick="saveProfit()">SAQLASH</button>
+      <button class="btn btn-secondary" onclick="closeProfitModal()">Bekor qilish</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="toast"></div>
 
-<script>
-// ===== DATA STORE =====
-let DB = {
-  customers: [],
-  transactions: [],
-  expenses: []
-};
-
-// Load from localStorage
-try {
-  const saved = localStorage.getItem('kurs_db');
-  if (saved) DB = JSON.parse(saved);
-} catch(e) {}
-
-function save() {
-  try { localStorage.setItem('kurs_db', JSON.stringify(DB)); } catch(e) {}
-}
-
-// ===== STATE =====
-let selectedCustomer = null;
-let txnType = 'won';
-let linkedOpenTxn = null;
-let analyticsCustomer = null;
-let scene, camera, renderer, pieGroup;
-let animFrameId;
-
-// ===== NAVIGATION =====
-function switchPage(p) {
-  document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(x => x.classList.remove('active'));
-  document.getElementById('page-' + p).classList.add('active');
-  document.getElementById('nav-' + p).classList.add('active');
-  if (p === 'analytics') { setTimeout(initAnalytics, 50); }
-  if (p === 'expenses') { renderExpenses(); }
-}
-
-// ===== CUSTOMER SEARCH =====
-function searchCustomer(val, autoSelect = false) {
-  const results = document.getElementById('search-results');
-  const warn = document.getElementById('new-customer-warn');
-  warn.style.display = 'none';
-  if (!val.trim()) { results.style.display = 'none'; return; }
-
-  const q = val.trim().toLowerCase();
-  const matches = DB.customers.filter(c =>
-    c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)
-  );
-
-  if (matches.length === 0) {
-    results.style.display = 'none';
-    showNewCustomerWarn(val.trim());
-    return;
-  }
-
-  // Auto-select: exact name match OR only one result when called from smart input
-  if (autoSelect) {
-    const exact = matches.find(c => c.name.toLowerCase() === q);
-    if (exact) { selectCustomer(exact.id); return; }
-    if (matches.length === 1) { selectCustomer(matches[0].id); return; }
-  }
-
-  results.style.display = 'block';
-  results.innerHTML = matches.slice(0, 5).map(c => `
-    <div class="search-item" onclick="selectCustomer('${c.id}')">
-      <div class="avatar">${c.name[0].toUpperCase()}</div>
-      <div class="info">
-        <div class="name">${c.name}</div>
-        <div class="phone">${c.phone || 'Telefon yo\'q'}</div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function showNewCustomerWarn(val) {
-  const warn = document.getElementById('new-customer-warn');
-  warn.style.display = 'block';
-  warn.innerHTML = `
-    <div class="warn-banner fade-in">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-      <div class="warn-text">
-        <strong>"${val}"</strong> — yangi mijoz?<br>
-        <span style="font-size:11px">Agar yozuvda xatolik bo'lsa, tekshiring</span>
-        <div class="warn-actions">
-          <button class="btn btn-sm btn-primary" onclick="createAndSelectCustomer('${val}')">✓ Ha, yangi</button>
-          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('customer-search').value='';document.getElementById('new-customer-warn').style.display='none'">✕ Xato</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-function createAndSelectCustomer(rawVal) {
-  const isPhone = /^\+?[\d\s-]{7,}$/.test(rawVal);
-  // Pre-fill modal fields
-  document.getElementById('nc-name').value = isPhone ? '' : rawVal;
-  document.getElementById('nc-phone').value = isPhone ? rawVal : '';
-  document.getElementById('new-customer-modal').classList.add('open');
-  // focus the empty field
-  setTimeout(() => {
-    if (isPhone) document.getElementById('nc-name').focus();
-    else document.getElementById('nc-phone').focus();
-  }, 300);
-}
-
-// ===== PHONE VALIDATION =====
-// Accepted formats:
-//   Korean mobile: 010-XXXX-XXXX or 01XXXXXXXXX (11 digits starting 010/011/016/017/018/019)
-//   Uzbek: +998XXXXXXXXX or 998XXXXXXXXX or 9XXXXXXXXX (9 digits local) or 09XXXXXXXX
-function normalizePhone(raw) {
-  const digits = raw.replace(/[\s\-().+]/g, '');
-  // Korean: starts with 01, 11 digits
-  if (/^01[016789]\d{7,8}$/.test(digits)) {
-    return digits.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
-  }
-  // Uzbek with 998 prefix (12 digits)
-  if (/^998\d{9}$/.test(digits)) {
-    return '+' + digits;
-  }
-  // Uzbek local 9 digits starting with 9
-  if (/^9[013789]\d{7}$/.test(digits)) {
-    return '+998' + digits;
-  }
-  // Uzbek 0XX format (10 digits starting 09)
-  if (/^0[9]\d{8}$/.test(digits)) {
-    return '+998' + digits.slice(1);
-  }
-  return null; // invalid
-}
-
-function formatPhoneInput(input) {
-  const val = input.value.trim();
-  const hintId = input.id + '-hint';
-  const hint = document.getElementById(hintId);
-  if (!val) { if(hint) hint.style.display='none'; return; }
-  const normalized = normalizePhone(val);
-  if (normalized) {
-    if(hint) { hint.textContent = '✓ ' + normalized; hint.style.color='var(--green)'; hint.style.display='block'; }
-  } else if (val.replace(/[\s\-().+]/g,'').length >= 7) {
-    if(hint) { hint.textContent = '⚠ Noto\'g\'ri format. Namuna: 01032235454 yoki +998901234567'; hint.style.color='var(--accent)'; hint.style.display='block'; }
-  } else {
-    if(hint) hint.style.display='none';
-  }
-}
-
-function validatePhoneField(raw) {
-  if (!raw.trim()) return { ok: true, value: '' }; // phone is optional
-  const n = normalizePhone(raw);
-  if (!n) return { ok: false, msg: 'Noto\'g\'ri telefon format. Koreya: 01032235454 · O\'zbek: +998901234567 yoki 901234567' };
-  return { ok: true, value: n };
-}
-
-function isNameOrPhoneDuplicate(name, phone, excludeId) {
-  const nameLow = name.toLowerCase();
-  return DB.customers.find(c => {
-    if (c.id === excludeId) return false;
-    if (c.name.toLowerCase() === nameLow) return true;
-    if (phone && c.phone && c.phone === phone) return true;
-    return false;
-  });
-}
-
-function confirmNewCustomer() {
-  const name = document.getElementById('nc-name').value.trim();
-  const rawPhone = document.getElementById('nc-phone').value.trim();
-  if (!name) { showToast('Ismni kiriting!', 'error'); return; }
-
-  const phoneResult = validatePhoneField(rawPhone);
-  if (!phoneResult.ok) { showToast(phoneResult.msg, 'error'); return; }
-
-  const dup = isNameOrPhoneDuplicate(name, phoneResult.value, null);
-  if (dup) {
-    showToast(`"${dup.name}" — bu mijoz allaqachon mavjud!`, 'error');
-    return;
-  }
-
-  const customer = { id: 'c_' + Date.now(), name, phone: phoneResult.value, createdAt: new Date().toISOString() };
-  DB.customers.push(customer);
-  save();
-  document.getElementById('new-customer-modal').classList.remove('open');
-  document.getElementById('new-customer-warn').style.display = 'none';
-  document.getElementById('nc-phone-hint').style.display = 'none';
-  selectCustomer(customer.id);
-  showToast('Yangi mijoz yaratildi: ' + customer.name, 'success');
-}
-
-// ===== EDIT CUSTOMER =====
-function openEditCustomer(id, e) {
-  if (e) e.stopPropagation();
-  const c = DB.customers.find(x => x.id === id);
-  if (!c) return;
-  document.getElementById('edit-customer-id').value = id;
-  document.getElementById('edit-nc-name').value = c.name;
-  document.getElementById('edit-nc-phone').value = c.phone || '';
-  document.getElementById('edit-customer-error').style.display = 'none';
-  document.getElementById('edit-customer-modal').classList.add('open');
-}
-
-function confirmEditCustomer() {
-  const id = document.getElementById('edit-customer-id').value;
-  const name = document.getElementById('edit-nc-name').value.trim();
-  const rawPhone = document.getElementById('edit-nc-phone').value.trim();
-  const errEl = document.getElementById('edit-customer-error');
-  errEl.style.display = 'none';
-
-  if (!name) { errEl.textContent = 'Ism bo\'sh bo\'lishi mumkin emas'; errEl.style.display='block'; return; }
-
-  const phoneResult = validatePhoneField(rawPhone);
-  if (!phoneResult.ok) { errEl.textContent = phoneResult.msg; errEl.style.display='block'; return; }
-
-  const dup = isNameOrPhoneDuplicate(name, phoneResult.value, id);
-  if (dup) { errEl.textContent = `"${dup.name}" — bu ism yoki telefon boshqa mijozda mavjud!`; errEl.style.display='block'; return; }
-
-  const idx = DB.customers.findIndex(c => c.id === id);
-  if (idx >= 0) { DB.customers[idx].name = name; DB.customers[idx].phone = phoneResult.value; }
-  save();
-  document.getElementById('edit-customer-modal').classList.remove('open');
-  renderCustomerList();
-  if (analyticsCustomer === id) renderCustomerDetail(id);
-  showToast('Mijoz yangilandi', 'success');
-}
-
-function selectCustomer(id) {
-  selectedCustomer = DB.customers.find(c => c.id === id);
-  document.getElementById('search-results').style.display = 'none';
-  document.getElementById('new-customer-warn').style.display = 'none';
-  document.getElementById('customer-search-wrap').style.display = 'none';
-
-  const chip = document.getElementById('customer-selected');
-  chip.style.display = 'block';
-  chip.innerHTML = `
-    <div class="customer-chip fade-in">
-      <div class="avatar">${selectedCustomer.name[0].toUpperCase()}</div>
-      <div class="info">
-        <div class="cname">${selectedCustomer.name}</div>
-        <div class="cphone">${selectedCustomer.phone || 'Telefon yo\'q'}</div>
-      </div>
-      <button class="chip-clear" onclick="clearCustomer()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>`;
-  updateOpenTransCard();
-}
-
-function clearCustomer() {
-  selectedCustomer = null;
-  document.getElementById('customer-selected').style.display = 'none';
-  document.getElementById('customer-search-wrap').style.display = 'block';
-  document.getElementById('customer-search').value = '';
-  updateOpenTransCard();
-}
-
-// ===== TRANSACTION TYPE =====
-function setType(t) {
-  txnType = t;
-  document.getElementById('btn-won').className = 'type-btn' + (t === 'won' ? ' active-won' : '');
-  document.getElementById('btn-usd').className = 'type-btn' + (t === 'usd' ? ' active-usd' : '');
-  document.getElementById('amount-label').textContent = t === 'won' ? 'Miqdor (WON)' : 'Miqdor (USD)';
-  updateOpenTransCard();
-}
-
-// ===== OPEN TRANSACTIONS =====
-function updateOpenTransCard() {
-  const card = document.getElementById('open-trans-card');
-  const list = document.getElementById('open-trans-list');
-  linkedOpenTxn = null;
-  document.getElementById('profit-preview').innerHTML = '';
-
-  // Find open transactions of opposite type
-  const oppositeType = txnType === 'won' ? 'usd' : 'won';
-  const openTxns = DB.transactions.filter(t =>
-    t.status === 'open' &&
-    t.type === oppositeType &&
-    (!selectedCustomer || t.customerId === selectedCustomer?.id)
-  );
-
-  if (openTxns.length === 0) {
-    card.style.display = 'none';
-    return;
-  }
-
-  card.style.display = 'block';
-
-  // Auto-link if only one option
-  if (openTxns.length === 1) {
-    linkedOpenTxn = openTxns[0];
-  }
-
-  list.innerHTML = openTxns.map(t => {
-    const cust = DB.customers.find(c => c.id === t.customerId);
-    const date = new Date(t.datetime).toLocaleDateString('uz', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-    const isAutoLinked = linkedOpenTxn && linkedOpenTxn.id === t.id;
-    return `
-    <div class="open-trans-item ${isAutoLinked ? 'selected' : ''}" id="ot_${t.id}" onclick="linkOpenTxn('${t.id}')">
-      <div class="ot-type ${t.type === 'won' ? 'ot-won' : 'ot-usd'}">${t.type.toUpperCase()}</div>
-      <div style="flex:1">
-        <div class="ot-customer">${cust?.name || 'Noma\'lum'}</div>
-        <div class="ot-date">${date}</div>
-      </div>
-      <div class="ot-amount">${fmtAmount(t.amount, t.type)}<br><span style="font-size:10px;color:var(--text3)">kurs: ${t.rate}</span></div>
-      ${isAutoLinked ? '<span style="font-size:9px;color:var(--accent);margin-left:6px;white-space:nowrap">AUTO</span>' : ''}
-    </div>`;
-  }).join('');
-
-  if (openTxns.length === 1) {
-    calcProfitPreview();
-  }
-}
-
-function linkOpenTxn(id) {
-  linkedOpenTxn = DB.transactions.find(t => t.id === id);
-  document.querySelectorAll('.open-trans-item').forEach(el => el.classList.remove('selected'));
-  document.getElementById('ot_' + id)?.classList.add('selected');
-  calcProfitPreview();
-}
-
-function calcProfitPreview() {
-  if (!linkedOpenTxn) return;
-  const amount = parseFloat(document.getElementById('amount-input').value) || 0;
-  const rate = parseFloat(document.getElementById('rate-input').value) || 0;
-  if (!amount || !rate) return;
-
-  // Profit formula: always (higher_rate - lower_rate) × USD_amount
-  // The USD amount is whichever side is USD (either current or open)
-  let profit = 0;
-  let usdAmount = 0;
-  let rateDiff = 0;
-
-  if (txnType === 'usd') {
-    // Current txn is USD, open txn was WON
-    // Client gave us WON at open_rate, now we settle in USD at current rate
-    // Profit = (current_rate - open_rate) × current_usd_amount
-    usdAmount = amount;
-    rateDiff = rate - linkedOpenTxn.rate;
-  } else {
-    // Current txn is WON, open txn was USD
-    // Client gave us USD at open_rate, now we settle in WON at current rate
-    // Profit = (open_rate - current_rate) × open_usd_amount
-    usdAmount = linkedOpenTxn.amount;
-    rateDiff = linkedOpenTxn.rate - rate;
-  }
-
-  profit = rateDiff * usdAmount;
-
-  const preview = document.getElementById('profit-preview');
-  const isProfit = profit >= 0;
-  preview.innerHTML = `
-    <div class="profit-preview ${isProfit ? '' : 'loss'} fade-in">
-      <div>
-        <div class="profit-label">${isProfit ? '✦ Foyda' : '↓ Zarar'}</div>
-        <div style="font-size:11px;color:var(--text3)">Kurs farqi: ${rateDiff >= 0 ? '+' : ''}${rateDiff} × ${usdAmount.toLocaleString()} USD</div>
-      </div>
-      <div class="profit-value">${isProfit ? '+' : ''}${Math.round(profit).toLocaleString()} ₩</div>
-    </div>`;
-}
-
-// ===== SAVE TRANSACTION =====
-function saveTransaction() {
-  if (!selectedCustomer) { showToast('Mijozni tanlang!', 'error'); return; }
-  const amount = parseFloat(document.getElementById('amount-input').value);
-  const rate = parseFloat(document.getElementById('rate-input').value);
-  if (!amount || !rate) { showToast('Miqdor va kursni kiriting!', 'error'); return; }
-
-  const datetime = document.getElementById('datetime-input').value ||
-    new Date().toISOString().slice(0, 16);
-
-  const txn = {
-    id: 't_' + Date.now(),
-    customerId: selectedCustomer.id,
-    type: txnType,
-    direction: 'oldi/sotdi',
-    amount, rate,
-    note: document.getElementById('note-input').value,
-    datetime,
-    status: 'open',
-    profit: null,
-    linkedTxnId: null,
-    createdAt: new Date().toISOString()
-  };
-
-  if (linkedOpenTxn) {
-    // Same formula as calcProfitPreview
-    let profit = 0;
-    if (txnType === 'usd') {
-      profit = (rate - linkedOpenTxn.rate) * amount;         // usd_amount = current amount
-    } else {
-      profit = (linkedOpenTxn.rate - rate) * linkedOpenTxn.amount; // usd_amount = open txn's amount
-    }
-    profit = Math.round(profit);
-
-    txn.status = 'closed';
-    txn.profit = profit;
-    txn.linkedTxnId = linkedOpenTxn.id;
-
-    const idx = DB.transactions.findIndex(t => t.id === linkedOpenTxn.id);
-    if (idx >= 0) {
-      DB.transactions[idx].status = 'closed';
-      DB.transactions[idx].linkedTxnId = txn.id;
-      DB.transactions[idx].profit = profit;
-    }
-    showToast(`Yopildi. ${profit >= 0 ? 'Foyda: +' : 'Zarar: '}${Math.abs(profit).toLocaleString()} ₩`, profit >= 0 ? 'success' : 'error');
-  } else {
-    showToast('Ochiq tranzaksiya saqlandi', 'success');
-  }
-
-  DB.transactions.push(txn);
-  save();
-  resetForm();
-}
-
-function resetForm() {
-  clearCustomer();
-  setType('won');
-  document.getElementById('amount-input').value = '';
-  document.getElementById('rate-input').value = '';
-  document.getElementById('note-input').value = '';
-  setNow();
-  linkedOpenTxn = null;
-  updateOpenTransCard();
-}
-
-function setNow() {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-  document.getElementById('datetime-input').value = local;
-}
-
-// ===== SMART INPUT =====
-function fillSmart(text) {
-  document.getElementById('smart-input').value = text;
-}
-
-function parseSmartInput() {
-  const raw = document.getElementById('smart-input').value.trim();
-  if (!raw) return;
-  const text = raw.toLowerCase();
-
-  const errors = [];
-  let filledSomething = false;
-
-  // --- Rate ---
-  const rateMatch = text.match(/kurs\s*[=:]?\s*([\d]{3,5})/);
-  if (rateMatch) {
-    const rate = parseInt(rateMatch[1]);
-    if (rate < 500 || rate > 9999) {
-      errors.push(`Kurs ${rate} — noto'g'ri diapazonda (500–9999 bo'lishi kerak)`);
-    } else {
-      document.getElementById('rate-input').value = rate;
-      filledSomething = true;
-    }
-  }
-
-  // --- Amount + currency ---
-  const amountMatch = text.match(/([\d]{1,12}(?:[.,][\d]{1,3})?)\s*(won|dollar|usd|\$|₩|млн|mln)?/);
-  if (amountMatch) {
-    let amount = parseFloat(amountMatch[1].replace(',', '.'));
-    const unit = amountMatch[2] || '';
-    if (unit === 'млн' || unit === 'mln') amount *= 1000000;
-    const isWon = unit === 'won' || unit === '₩';
-    const isUsd = unit === 'dollar' || unit === 'usd' || unit === '$';
-
-    if (amount <= 0) {
-      errors.push('Miqdor 0 dan katta bo\'lishi kerak');
-    } else if (isWon && amount < 100) {
-      errors.push(`${amount} WON — juda kichik summa, to'g'rimi?`);
-    } else if (isUsd && amount > 1000000) {
-      errors.push(`${amount} USD — juda katta summa, to'g'rimi?`);
-    } else {
-      document.getElementById('amount-input').value = amount;
-      if (isWon) setType('won');
-      else if (isUsd) setType('usd');
-      filledSomething = true;
-    }
-  }
-
-  // --- Customer name (first alphabetic token not a keyword) ---
-  const keywords = new Set(['won','dollar','usd','kurs','oldi','sotdi','berdi','olindi','mln','млн','va','dan','ga','bu']);
-  const tokens = raw.split(/\s+/);
-  const nameToken = tokens.find(w =>
-    w.length >= 2 &&
-    /^[a-zA-ZА-Яа-яёЁÀ-ÿ\u0400-\u04FF\u00C0-\u017F]+$/i.test(w) &&
-    !keywords.has(w.toLowerCase()) &&
-    isNaN(w)
-  );
-  if (nameToken) {
-    const name = nameToken.charAt(0).toUpperCase() + nameToken.slice(1).toLowerCase();
-    document.getElementById('customer-search').value = name;
-    searchCustomer(name, true);
-    filledSomething = true;
-  }
-
-  // --- Nothing recognized at all ---
-  if (!filledSomething && errors.length === 0) {
-    errors.push('Hech narsa aniqlanmadi. Namuna: "Alisher 1000 won kurs 1350"');
-  }
-
-  document.getElementById('smart-input').value = '';
-
-  if (errors.length > 0) {
-    showSmartError(errors);
-  } else {
-    showToast('Ma\'lumot to\'ldirildi ✓', 'success');
-  }
-}
-
-function showSmartError(errors) {
-  const existing = document.getElementById('smart-error-banner');
-  if (existing) existing.remove();
-  const banner = document.createElement('div');
-  banner.id = 'smart-error-banner';
-  banner.style.cssText = 'background:rgba(224,64,96,.1);border:1px solid rgba(224,64,96,.3);border-radius:10px;padding:12px 14px;margin-top:8px;font-size:13px;color:var(--red);line-height:1.7;animation:fadeIn .2s ease';
-  banner.innerHTML = '⚠ ' + errors.join('<br>⚠ ') + '<br><span style="font-size:11px;color:var(--text3)">Namuna: Alisher 2000000 won kurs 1355</span>';
-  document.getElementById('smart-input').parentElement.after(banner);
-  setTimeout(() => banner.remove(), 4000);
-}
-
-// ===== HELPERS =====
-function fmtAmount(a, type) {
-  if (type === 'won') return Math.round(a).toLocaleString() + ' ₩';
-  return a.toLocaleString() + ' $';
-}
-
-function fmtDate(d) {
-  return new Date(d).toLocaleDateString('uz', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-
-function showToast(msg, type = '') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show ' + type;
-  setTimeout(() => t.className = '', 2500);
-}
-
-// ===== 3D PIE CHART =====
-function initAnalytics() {
-  renderAnalyticsStats();
-  renderCustomerList();
-  init3DChart();
-}
-
-function renderAnalyticsStats() {
-  let totalProfit = 0, totalWon = 0, totalUsd = 0;
-  DB.transactions.forEach(t => {
-    if (t.status === 'closed' && t.profit) totalProfit += t.profit;
-    if (t.type === 'won') totalWon += t.amount;
-    if (t.type === 'usd') totalUsd += t.amount;
-  });
-  let totalExp = 0, totalExpUsd = 0;
-  DB.expenses.forEach(e => {
-    if (e.currency === 'won') totalExp += e.amount;
-    else totalExpUsd += e.amount;
-  });
-
-  document.getElementById('total-profit-stat').textContent = totalProfit.toLocaleString() + ' ₩';
-  document.getElementById('total-expense-stat').textContent = totalExp.toLocaleString() + ' ₩';
-  document.getElementById('total-won-stat').textContent = totalWon.toLocaleString() + ' ₩';
-  document.getElementById('total-usd-stat').textContent = totalUsd.toLocaleString() + ' $';
-}
-
-function getCustomerStats(cid) {
-  const txns = DB.transactions.filter(t => t.customerId === cid);
-  let wonIn = 0, usdIn = 0, profit = 0;
-  txns.forEach(t => {
-    if (t.type === 'won') wonIn += t.amount;
-    if (t.type === 'usd') usdIn += t.amount;
-    if (t.status === 'closed' && t.profit) profit += t.profit;
-  });
-  return { wonIn, usdIn, profit, txnCount: txns.length, openCount: txns.filter(t => t.status === 'open').length };
-}
-
-function init3DChart() {
-  const container = document.getElementById('chart-container');
-  const canvas = document.getElementById('chart-canvas');
-
-  if (renderer) {
-    cancelAnimationFrame(animFrameId);
-    renderer.dispose();
-  }
-
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
-  camera.position.set(0, 3.5, 5);
-  camera.lookAt(0, 0, 0);
-
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setSize(container.clientWidth, container.clientHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-  // Lights
-  const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-  scene.add(ambient);
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-  dirLight.position.set(3, 5, 5);
-  scene.add(dirLight);
-  const pointLight = new THREE.PointLight(0xf0c040, 0.8, 20);
-  pointLight.position.set(-3, 3, 0);
-  scene.add(pointLight);
-
-  buildPieChart(analyticsCustomer);
-
-  function animate() {
-    animFrameId = requestAnimationFrame(animate);
-    if (pieGroup) pieGroup.rotation.y += 0.005;
-    renderer.render(scene, camera);
-  }
-  animate();
-}
-
-function buildPieChart(customerId) {
-  if (pieGroup) scene.remove(pieGroup);
-  pieGroup = new THREE.Group();
-  scene.add(pieGroup);
-
-  let rawData = [];
-  if (customerId) {
-    const stats = getCustomerStats(customerId);
-    rawData = [
-      { label: 'WON aylanma', value: stats.wonIn,            color: 0xf0c040 },
-      { label: 'USD aylanma', value: stats.usdIn * 1350,     color: 0x30e09a },
-      { label: 'Foyda',       value: Math.max(stats.profit, 0), color: 0x4090f0 },
-    ];
-  } else {
-    let totalWon = 0, totalUsd = 0, totalProfit = 0;
-    DB.transactions.forEach(t => {
-      if (t.type === 'won') totalWon += t.amount;
-      if (t.type === 'usd') totalUsd += t.amount * 1350;
-      if (t.status === 'closed' && t.profit > 0) totalProfit += t.profit;
-    });
-    rawData = [
-      { label: 'WON',    value: totalWon,    color: 0xf0c040 },
-      { label: 'USD (₩)',value: totalUsd,    color: 0x30e09a },
-      { label: 'Foyda',  value: totalProfit, color: 0x4090f0 },
-    ];
-  }
-
-  // ← KEY FIX: strictly remove zero/negative values before rendering
-  const data = rawData.filter(d => d.value > 0);
-
-  if (data.length === 0) {
-    data.push({ label: 'Ma\'lumot yo\'q', value: 1, color: 0x2a2a45 });
-  }
-
-  const total = data.reduce((s, d) => s + d.value, 0);
-  const PIE_R = 2.1;      // radius
-  const HEIGHT = 0.85;    // taller slices → more visible
-  const GAP = 0.022;      // angular gap between slices (radians)
-  let startAngle = -Math.PI / 2; // start from top
-
-  const legend = document.getElementById('chart-legend');
-  legend.innerHTML = '';
-
-  data.forEach((d, i) => {
-    const fullAngle = (d.value / total) * Math.PI * 2;
-    // subtract gap on each side so slices never touch
-    const sliceAngle = Math.max(fullAngle - GAP * 2, 0.01);
-    const gappedStart = startAngle + GAP;
-    const mid = gappedStart + sliceAngle / 2;
-
-    const segments = Math.max(Math.ceil(sliceAngle * 24), 4);
-
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0);
-    for (let s = 0; s <= segments; s++) {
-      const a = gappedStart + (s / segments) * sliceAngle;
-      shape.lineTo(Math.cos(a) * PIE_R, Math.sin(a) * PIE_R);
-    }
-    shape.lineTo(0, 0);
-
-    const extrudeSettings = {
-      depth: HEIGHT,
-      bevelEnabled: true,
-      bevelThickness: 0.05,
-      bevelSize: 0.03,
-      bevelSegments: 3
-    };
-    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-
-    // Emissive glow so small slices stay vivid
-    const material = new THREE.MeshPhongMaterial({
-      color: d.color,
-      emissive: new THREE.Color(d.color).multiplyScalar(0.18),
-      shininess: 100,
-      specular: new THREE.Color(0x888888),
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.x = -Math.PI / 2;
-
-    // Push slice outward from centre for clear gap effect
-    const outset = 0.12;
-    mesh.position.set(Math.cos(mid) * outset, i * 0.012, Math.sin(mid) * outset);
-
-    pieGroup.add(mesh);
-    startAngle += fullAngle;
-
-    // Legend — bigger, bolder
-    const pct = Math.round(d.value / total * 100);
-    const pctExact = (d.value / total * 100).toFixed(1);
-    const colorHex = '#' + d.color.toString(16).padStart(6, '0');
-    legend.innerHTML += `
-      <div class="legend-item" style="flex-direction:column;align-items:flex-start;gap:2px;flex:1;min-width:80px">
-        <div style="display:flex;align-items:center;gap:7px">
-          <div class="legend-dot" style="background:${colorHex};width:13px;height:13px;border-radius:3px;flex-shrink:0"></div>
-          <span style="font-size:13px;font-weight:600;color:var(--text)">${d.label}</span>
-        </div>
-        <span style="font-size:20px;font-family:'Space Mono',monospace;font-weight:700;color:${colorHex};padding-left:20px">${pct}%</span>
-        <span style="font-size:10px;color:var(--text3);padding-left:20px">${(d.value/1000000).toFixed(2)}M ₩</span>
-      </div>`;
-  });
-
-  pieGroup.rotation.x = 0.25;
-}
-
-function renderCustomerList() {
-  const container = document.getElementById('customers-scroll');
-  if (DB.customers.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="es-icon">👥</div><div class="es-text">Mijozlar yo\'q</div></div>';
-    return;
-  }
-
-  container.innerHTML = DB.customers.map(c => {
-    const stats = getCustomerStats(c.id);
-    const isProfit = stats.profit >= 0;
-    return `
-    <div class="customer-row ${analyticsCustomer === c.id ? 'active' : ''}" onclick="selectAnalyticsCustomer('${c.id}')">
-      <div class="cr-avatar">${c.name[0].toUpperCase()}</div>
-      <div style="flex:1;min-width:0">
-        <div class="cr-name">${c.name}</div>
-        <div class="cr-count">${stats.txnCount} tranzaksiya${stats.openCount > 0 ? ` · <span style="color:var(--blue)">${stats.openCount} ochiq</span>` : ''}</div>
-      </div>
-      ${stats.txnCount > 0 ? `<div class="cr-badge ${isProfit ? '' : 'neg'}">${isProfit ? '+' : ''}${Math.round(stats.profit).toLocaleString()}₩</div>` : ''}
-      <button onclick="openEditCustomer('${c.id}', event)" style="background:none;border:1px solid var(--border);color:var(--text3);border-radius:7px;padding:5px 9px;cursor:pointer;font-size:11px;margin-left:6px;flex-shrink:0" title="Tahrirlash">✎</button>
-    </div>`;
-  }).join('');
-}
-
-function selectAnalyticsCustomer(cid) {
-  analyticsCustomer = cid;
-  renderCustomerList();
-  buildPieChart(cid);
-  renderCustomerDetail(cid);
-}
-
-function renderCustomerDetail(cid) {
-  const cust = DB.customers.find(c => c.id === cid);
-  if (!cust) return;
-  const stats = getCustomerStats(cid);
-  const txns = DB.transactions.filter(t => t.customerId === cid).sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
-
-  const area = document.getElementById('customer-detail-area');
-  area.innerHTML = `
-    <div class="customer-detail fade-in">
-      <div class="detail-name">${cust.name}</div>
-      <div class="detail-phone">${cust.phone || 'Tel yo\'q'} · Mijoz ${fmtDate(cust.createdAt)}</div>
-      <div class="detail-grid">
-        <div class="detail-item">
-          <div class="dl">WON aylanma</div>
-          <div class="dv" style="color:var(--won)">${Math.round(stats.wonIn).toLocaleString()} ₩</div>
-        </div>
-        <div class="detail-item">
-          <div class="dl">USD aylanma</div>
-          <div class="dv" style="color:var(--usd)">${stats.usdIn.toLocaleString()} $</div>
-        </div>
-        <div class="detail-item">
-          <div class="dl">Jami foyda</div>
-          <div class="dv" style="color:${stats.profit >= 0 ? 'var(--green)' : 'var(--red)'}">${stats.profit >= 0 ? '+' : ''}${Math.round(stats.profit).toLocaleString()} ₩</div>
-        </div>
-        <div class="detail-item">
-          <div class="dl">Tranzaksiyalar</div>
-          <div class="dv">${stats.txnCount}</div>
-        </div>
-      </div>
-      <div class="trans-history">
-        <div class="th-title">TRANZAKSIYALAR TARIXI</div>
-        ${txns.length === 0 ? '<div style="color:var(--text3);font-size:13px">Hali tranzaksiya yo\'q</div>' :
-          txns.map(t => `
-            <div class="trans-item">
-              <div class="trans-icon ${t.type === 'won' ? 'ti-won' : 'ti-usd'}">${t.type === 'won' ? '₩' : '$'}</div>
-              <div class="trans-info">
-                <div class="trans-main">${fmtAmount(t.amount, t.type)} · kurs ${t.rate}</div>
-                <div class="trans-date">${fmtDate(t.datetime)}</div>
-              </div>
-              <div>
-                ${t.status === 'open'
-                  ? '<span class="open-badge">OCHIQ</span>'
-                  : `<div class="trans-profit ${t.profit >= 0 ? '' : 'loss'}">${t.profit >= 0 ? '+' : ''}${Math.round(t.profit).toLocaleString()}₩</div>`
-                }
-              </div>
-            </div>`).join('')}
-      </div>
-    </div>`;
-}
-
-// ===== EXPENSES =====
-function openExpenseModal() {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-  document.getElementById('exp-date').value = local;
-  document.getElementById('expense-modal').classList.add('open');
-}
-function closeExpenseModal() {
-  document.getElementById('expense-modal').classList.remove('open');
-}
-
-function saveExpense() {
-  const desc = document.getElementById('exp-desc').value.trim();
-  const amount = parseFloat(document.getElementById('exp-amount').value);
-  const currency = document.getElementById('exp-currency').value;
-  const cat = document.getElementById('exp-cat').value.trim() || 'Boshqa';
-  const date = document.getElementById('exp-date').value;
-
-  if (!desc || !amount) { showToast('Tavsif va miqdorni kiriting!', 'error'); return; }
-
-  DB.expenses.push({ id: 'e_' + Date.now(), desc, amount, currency, cat, date, createdAt: new Date().toISOString() });
-  save();
-  closeExpenseModal();
-  renderExpenses();
-  showToast('Rasxod saqlandi', 'success');
-  document.getElementById('exp-desc').value = '';
-  document.getElementById('exp-amount').value = '';
-  document.getElementById('exp-cat').value = '';
-}
-
-function renderExpenses() {
-  const list = document.getElementById('expense-list');
-  if (DB.expenses.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="es-icon">💸</div><div class="es-text">Rasxodlar yo\'q</div></div>';
-  } else {
-    const sorted = [...DB.expenses].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    list.innerHTML = sorted.map(e => `
-      <div class="expense-item">
-        <div class="ex-icon">💸</div>
-        <div class="ex-info">
-          <div class="ex-desc">${e.desc}</div>
-          <div class="ex-date">${fmtDate(e.date)} · ${e.cat}</div>
-        </div>
-        <div class="ex-amount">-${e.amount.toLocaleString()} ${e.currency === 'won' ? '₩' : '$'}</div>
-      </div>`).join('');
-  }
-
-  // Summary
-  let totalWon = 0, totalUsd = 0;
-  const cats = {};
-  DB.expenses.forEach(e => {
-    if (e.currency === 'won') totalWon += e.amount; else totalUsd += e.amount;
-    cats[e.cat] = (cats[e.cat] || 0) + (e.currency === 'won' ? e.amount : e.amount * 1350);
-  });
-  document.getElementById('exp-total-won').textContent = totalWon.toLocaleString() + ' ₩';
-  document.getElementById('exp-total-usd').textContent = totalUsd.toLocaleString() + ' $';
-  const catDiv = document.getElementById('exp-by-category');
-  catDiv.innerHTML = Object.entries(cats).sort((a,b) => b[1]-a[1]).map(([k, v]) => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:14px">${k}</span>
-      <span style="font-size:13px;font-family:'Space Mono',monospace;color:var(--red)">${Math.round(v).toLocaleString()} ₩</span>
-    </div>`).join('');
-}
-
-function switchExpTab(t) {
-  document.getElementById('exp-tab-list').style.display = t === 'list' ? 'block' : 'none';
-  document.getElementById('exp-tab-summary').style.display = t === 'summary' ? 'block' : 'none';
-  document.getElementById('etab-list').className = 'itab' + (t === 'list' ? ' active' : '');
-  document.getElementById('etab-summary').className = 'itab' + (t === 'summary' ? ' active' : '');
-}
-
-// ===== MOCK DATA (only if DB is empty) =====
-function loadMockData() {
-  if (DB.customers.length > 0) return;
-
-  const customers = [
-    { id: 'c_001', name: 'Alisher Karimov',  phone: '+998 90 123 45 67', createdAt: '2026-02-01T09:00:00' },
-    { id: 'c_002', name: 'Bobur Toshmatov',  phone: '+998 91 234 56 78', createdAt: '2026-02-05T11:00:00' },
-    { id: 'c_003', name: 'Dilnoza Yusupova', phone: '+998 93 345 67 89', createdAt: '2026-02-10T14:00:00' },
-    { id: 'c_004', name: 'Jamshid Rakhimov', phone: '+998 94 456 78 90', createdAt: '2026-02-15T10:00:00' },
-    { id: 'c_005', name: 'Kamola Nazarova',  phone: '',                  createdAt: '2026-02-20T16:00:00' },
-  ];
-
-  // Transactions: paired (closed) + some open
-  const transactions = [
-    // Alisher: WON→USD deal, profit
-    { id: 't_001', customerId: 'c_001', type: 'won', direction: 'oldi/sotdi', amount: 2000000, rate: 1340, note: '', datetime: '2026-02-10T10:00', status: 'closed', profit: 30000, linkedTxnId: 't_002', createdAt: '2026-02-10T10:00:00' },
-    { id: 't_002', customerId: 'c_001', type: 'usd', direction: 'oldi/sotdi', amount: 1492,   rate: 1355, note: '', datetime: '2026-02-10T15:00', status: 'closed', profit: 30000, linkedTxnId: 't_001', createdAt: '2026-02-10T15:00:00' },
-    // Alisher: second deal
-    { id: 't_003', customerId: 'c_001', type: 'usd', direction: 'oldi/sotdi', amount: 800,    rate: 1348, note: 'tez kerak edi', datetime: '2026-02-20T09:30', status: 'closed', profit: 16000, linkedTxnId: 't_004', createdAt: '2026-02-20T09:30:00' },
-    { id: 't_004', customerId: 'c_001', type: 'won', direction: 'oldi/sotdi', amount: 1078400, rate: 1368, note: '', datetime: '2026-02-21T11:00', status: 'closed', profit: 16000, linkedTxnId: 't_003', createdAt: '2026-02-21T11:00:00' },
-    // Alisher open
-    { id: 't_005', customerId: 'c_001', type: 'won', direction: 'oldi/sotdi', amount: 3000000, rate: 1352, note: '', datetime: '2026-03-01T09:00', status: 'open', profit: null, linkedTxnId: null, createdAt: '2026-03-01T09:00:00' },
-
-    // Bobur: loss deal
-    { id: 't_006', customerId: 'c_002', type: 'usd', direction: 'oldi/sotdi', amount: 2000,   rate: 1360, note: '', datetime: '2026-02-12T13:00', status: 'closed', profit: -20000, linkedTxnId: 't_007', createdAt: '2026-02-12T13:00:00' },
-    { id: 't_007', customerId: 'c_002', type: 'won', direction: 'oldi/sotdi', amount: 2710000, rate: 1350, note: '', datetime: '2026-02-13T10:00', status: 'closed', profit: -20000, linkedTxnId: 't_006', createdAt: '2026-02-13T10:00:00' },
-    // Bobur open
-    { id: 't_008', customerId: 'c_002', type: 'usd', direction: 'oldi/sotdi', amount: 500,    rate: 1355, note: '', datetime: '2026-03-05T14:00', status: 'open', profit: null, linkedTxnId: null, createdAt: '2026-03-05T14:00:00' },
-
-    // Dilnoza: profit
-    { id: 't_009', customerId: 'c_003', type: 'won', direction: 'oldi/sotdi', amount: 5000000, rate: 1345, note: '', datetime: '2026-02-18T11:00', status: 'closed', profit: 75000, linkedTxnId: 't_010', createdAt: '2026-02-18T11:00:00' },
-    { id: 't_010', customerId: 'c_003', type: 'usd', direction: 'oldi/sotdi', amount: 3717,   rate: 1360, note: '', datetime: '2026-02-19T16:00', status: 'closed', profit: 75000, linkedTxnId: 't_009', createdAt: '2026-02-19T16:00:00' },
-
-    // Jamshid: open
-    { id: 't_011', customerId: 'c_004', type: 'won', direction: 'oldi/sotdi', amount: 1500000, rate: 1350, note: 'kechiktirildi', datetime: '2026-03-07T09:00', status: 'open', profit: null, linkedTxnId: null, createdAt: '2026-03-07T09:00:00' },
-    { id: 't_012', customerId: 'c_004', type: 'usd', direction: 'oldi/sotdi', amount: 300,    rate: 1358, note: '', datetime: '2026-03-08T10:00', status: 'open', profit: null, linkedTxnId: null, createdAt: '2026-03-08T10:00:00' },
-
-    // Kamola
-    { id: 't_013', customerId: 'c_005', type: 'usd', direction: 'oldi/sotdi', amount: 1000,   rate: 1352, note: '', datetime: '2026-03-01T15:00', status: 'closed', profit: 8000, linkedTxnId: 't_014', createdAt: '2026-03-01T15:00:00' },
-    { id: 't_014', customerId: 'c_005', type: 'won', direction: 'oldi/sotdi', amount: 1360000, rate: 1360, note: '', datetime: '2026-03-02T11:00', status: 'closed', profit: 8000, linkedTxnId: 't_013', createdAt: '2026-03-02T11:00:00' },
-  ];
-
-  const expenses = [
-    { id: 'e_001', desc: 'Ofis ijarasi', amount: 800000, currency: 'won', cat: 'Ijara', date: '2026-02-01T09:00', createdAt: '2026-02-01T09:00:00' },
-    { id: 'e_002', desc: 'Telefon tarifi', amount: 30000, currency: 'won', cat: 'Kommunikatsiya', date: '2026-02-05T10:00', createdAt: '2026-02-05T10:00:00' },
-    { id: 'e_003', desc: 'Yordamchi maoshi', amount: 200, currency: 'usd', cat: 'Maosh', date: '2026-02-28T17:00', createdAt: '2026-02-28T17:00:00' },
-    { id: 'e_004', desc: 'Ofis ijarasi', amount: 800000, currency: 'won', cat: 'Ijara', date: '2026-03-01T09:00', createdAt: '2026-03-01T09:00:00' },
-    { id: 'e_005', desc: 'Transport', amount: 15000, currency: 'won', cat: 'Transport', date: '2026-03-05T08:00', createdAt: '2026-03-05T08:00:00' },
-  ];
-
-  DB.customers = customers;
-  DB.transactions = transactions;
-  DB.expenses = expenses;
-  save();
-}
-
-// ===== INPUT EVENTS =====
-document.getElementById('amount-input').addEventListener('input', calcProfitPreview);
-document.getElementById('rate-input').addEventListener('input', calcProfitPreview);
-document.addEventListener('click', e => {
-  const sr = document.getElementById('search-results');
-  if (!e.target.closest('#customer-search') && !e.target.closest('#search-results')) {
-    sr.style.display = 'none';
-  }
-});
-
-loadMockData();
-
-// ===== INIT =====
-setNow();
-
-// Close modals on overlay click
-document.getElementById('expense-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeExpenseModal();
-});
-document.getElementById('new-customer-modal').addEventListener('click', function(e) {
-  if (e.target === this) this.classList.remove('open');
-});
-document.getElementById('edit-customer-modal').addEventListener('click', function(e) {
-  if (e.target === this) this.classList.remove('open');
-});
-</script>
+<script src="scripts.js"></script>
 </body>
 </html>
+
