@@ -2,6 +2,7 @@
 const AUTH_KEY = 'kurs_auth';
 const API_BASE = window.KursInfra ? window.KursInfra.resolveApiBase() : 'http://localhost:5075';
 const inviteToken = new URLSearchParams(window.location.search).get('invite');
+const requestedPage = new URLSearchParams(window.location.search).get('page');
 
 let DB = {
   customers: [],
@@ -150,6 +151,13 @@ function showAppShell() {
   document.getElementById('app').style.visibility = 'visible';
   document.getElementById('session-user').textContent = `${authSession.userName} (${authSession.role})`;
   applyRoleUi();
+
+  if (requestedPage) {
+    const page = requestedPage.toLowerCase();
+    if (canAccessPage(page)) {
+      setTimeout(() => switchPage(page), 0);
+    }
+  }
 }
 
 async function apiRequest(path, options = {}) {
