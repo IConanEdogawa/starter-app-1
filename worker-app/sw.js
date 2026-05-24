@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kurs-worker-v2';
+const CACHE_NAME = 'kurs-worker-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',

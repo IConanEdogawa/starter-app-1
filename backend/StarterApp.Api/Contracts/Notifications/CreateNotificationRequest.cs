@@ -5,5 +5,8 @@ public sealed record CreateNotificationRequest(
     string Message,
     string? RelatedType,
     string? RelatedId,
-    string? TargetRole
+    string? TargetRole,
+    string? TargetUserId,
+    bool? IsLatestTransaction,
+    DateTime? TransactionCreatedAtUtc
 );

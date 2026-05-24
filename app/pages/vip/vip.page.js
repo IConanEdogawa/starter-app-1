@@ -3,6 +3,9 @@ const AUTH_KEY = 'kurs_auth';
 const API_BASE = window.KursInfra ? window.KursInfra.resolveApiBase() : 'http://localhost:5075';
 const inviteToken = new URLSearchParams(window.location.search).get('invite');
 const requestedPage = new URLSearchParams(window.location.search).get('page');
+const NOTIFY_OUTBOX_KEY = 'kurs_notify_outbox';
+const NOTIFIED_TXN_KEY = 'kurs_notified_latest';
+const REPORT_MONTH_KEY = 'kurs_report_month';
 
 let DB = {
   customers: [],
@@ -21,6 +24,231 @@ function save() {
   try { localStorage.setItem('kurs_db', JSON.stringify(DB)); } catch(e) {}
 }
 
+function saveNotifyOutbox() {
+  try { localStorage.setItem(NOTIFY_OUTBOX_KEY, JSON.stringify(notifyOutbox)); } catch(e) {}
+}
+
+function saveNotifiedLatestMap() {
+  try { localStorage.setItem(NOTIFIED_TXN_KEY, JSON.stringify(notifiedLatestByTxn)); } catch(e) {}
+}
+
+function getTransactionById(txnId) {
+  return DB.transactions.find(t => t.id === txnId) || null;
+}
+
+function getLatestTransaction() {
+  if (!DB.transactions.length) return null;
+  return [...DB.transactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+}
+
+function getCustomerNameById(customerId) {
+  const c = DB.customers.find(x => x.id === customerId);
+  return c?.name || 'Noma\'lum mijoz';
+}
+
+function formatTxnSummary(txn) {
+  const customerName = getCustomerNameById(txn.customerId);
+  const amountLabel = txn.type === 'won'
+    ? `${Math.round(txn.amount).toLocaleString()} WON`
+    : `${txn.amount.toLocaleString()} USD`;
+  return `${customerName} · ${amountLabel} · kurs ${txn.rate}`;
+}
+
+function getNotifyModeLabel(mode) {
+  return mode === 'manual' ? 'manual' : 'latest';
+}
+
+function getCurrentReportMonth() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function getLatestReportMonthFromData() {
+  const rows = [...DB.expenses, ...DB.profits]
+    .map(parseReportDate)
+    .filter(Boolean)
+    .sort((a, b) => b - a);
+
+  if (rows.length === 0) {
+    return getCurrentReportMonth();
+  }
+
+  const latest = rows[0];
+  return `${latest.getFullYear()}-${String(latest.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function normalizeReportMonth(value) {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})$/);
+  if (!match) return getCurrentReportMonth();
+
+  const month = Math.min(12, Math.max(1, Number(match[2])));
+  return `${match[1]}-${String(month).padStart(2, '0')}`;
+}
+
+function getReportMonth() {
+  const input = document.getElementById('report-month-input');
+  return normalizeReportMonth(input?.value || reportMonth);
+}
+
+function getRecordReportDate(record) {
+  return record?.date || record?.createdAt || '';
+}
+
+function parseReportDate(record) {
+  const raw = getRecordReportDate(record);
+  if (!raw) return null;
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function isRecordInSelectedMonth(record, monthKey) {
+  const date = parseReportDate(record);
+  if (!date) return false;
+  const candidate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  return candidate === normalizeReportMonth(monthKey);
+}
+
+function getWeekBucketForRecord(record) {
+  const date = parseReportDate(record);
+  if (!date) return 4;
+  return Math.min(4, Math.floor((date.getDate() - 1) / 7) + 1);
+}
+
+function formatReportMoney(value) {
+  return Math.round(value).toLocaleString();
+}
+
+function buildFourWeekSummary(rows) {
+  return [1, 2, 3, 4].map(week => {
+    const weekRows = rows.filter(row => getWeekBucketForRecord(row) === week);
+    const wonTotal = weekRows.filter(row => row.currency === 'won').reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    const usdTotal = weekRows.filter(row => row.currency === 'usd').reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    const wonEquivalent = wonTotal + (usdTotal * 1350);
+
+    return {
+      week,
+      count: weekRows.length,
+      wonTotal,
+      usdTotal,
+      wonEquivalent
+    };
+  });
+}
+
+function setReportMonth(monthValue, silent = false) {
+  reportMonth = normalizeReportMonth(monthValue);
+  try {
+    localStorage.setItem(REPORT_MONTH_KEY, reportMonth);
+  } catch {
+    // Ignore storage errors.
+  }
+  const input = document.getElementById('report-month-input');
+  if (input && input.value !== reportMonth) {
+    input.value = reportMonth;
+  }
+
+  if (!silent) {
+    renderExpenses();
+    renderProfits();
+    renderAnalyticsStats();
+    refreshReportsPageIfOpen();
+    syncReportDataFromServer();
+  }
+}
+
+function buildAuthHeaders(extraHeaders = {}, includeJsonContentType = true) {
+  const headers = {
+    ...(includeJsonContentType ? { 'Content-Type': 'application/json' } : {}),
+    ...extraHeaders
+  };
+
+  if (authSession?.token) {
+    headers.Authorization = `Bearer ${authSession.token}`;
+  }
+
+  return headers;
+}
+
+async function fetchWithAuth(path, options = {}, includeJsonContentType = true) {
+  return fetch(API_BASE + path, {
+    ...options,
+    headers: buildAuthHeaders(options.headers || {}, includeJsonContentType)
+  });
+}
+
+async function apiRequestBlob(path, options = {}) {
+  const response = await fetchWithAuth(path, options, true);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Server error');
+  }
+
+  return response.blob();
+}
+
+async function apiRequestFormData(path, formData, options = {}) {
+  const response = await fetchWithAuth(path, {
+    ...options,
+    method: options.method || 'POST',
+    body: formData
+  }, false);
+
+  const isJson = response.headers.get('content-type')?.includes('application/json');
+  const body = isJson ? await response.json() : await response.text();
+  if (!response.ok) {
+    throw new Error(typeof body === 'string' ? body : (body?.title || body?.message || 'Server error'));
+  }
+
+  return body;
+}
+
+function mapServerReportItem(item, fallbackPrefix) {
+  return {
+    id: item.id || `${fallbackPrefix}_${Date.now()}`,
+    desc: item.description || '',
+    amount: Number(item.amount) || 0,
+    currency: item.currency || 'won',
+    cat: item.category || 'Boshqa',
+    date: item.date || item.createdAt || new Date().toISOString(),
+    createdAt: item.createdAt || new Date().toISOString()
+  };
+}
+
+function toReportEntryPayload(item) {
+  return {
+    description: item.desc,
+    amount: Number(item.amount) || 0,
+    currency: item.currency,
+    category: item.cat,
+    date: item.date || item.createdAt || new Date().toISOString(),
+    createdAt: item.createdAt || new Date().toISOString()
+  };
+}
+
+async function syncReportDataFromServer() {
+  if (!authSession || !navigator.onLine) {
+    return false;
+  }
+
+  try {
+    const snapshot = await apiRequest(`/api/reports/snapshot?month=${encodeURIComponent(getReportMonth())}`);
+    DB.expenses = Array.isArray(snapshot.expenses) ? snapshot.expenses.map(item => mapServerReportItem(item, 'e')) : [];
+    DB.profits = Array.isArray(snapshot.profits) ? snapshot.profits.map(item => mapServerReportItem(item, 'p')) : [];
+    save();
+    renderExpenses();
+    renderProfits();
+    renderAnalyticsStats();
+    renderReportsOverview();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ===== STATE =====
 let selectedCustomer = null;
 let txnType = 'won';
@@ -29,6 +257,31 @@ let scene, camera, renderer, pieGroup;
 let animFrameId;
 let authSession = null;
 let lastSavedTransaction = null;
+let notifyWorkers = [];
+let notifyModalMode = 'latest';
+let notifyOutbox = [];
+let notifiedLatestByTxn = {};
+let reportMonth = normalizeReportMonth(localStorage.getItem(REPORT_MONTH_KEY) || getCurrentReportMonth());
+
+try {
+  const rawOutbox = localStorage.getItem(NOTIFY_OUTBOX_KEY);
+  if (rawOutbox) {
+    const parsed = JSON.parse(rawOutbox);
+    if (Array.isArray(parsed)) notifyOutbox = parsed;
+  }
+} catch {
+  notifyOutbox = [];
+}
+
+try {
+  const rawNotified = localStorage.getItem(NOTIFIED_TXN_KEY);
+  if (rawNotified) {
+    const parsed = JSON.parse(rawNotified);
+    if (parsed && typeof parsed === 'object') notifiedLatestByTxn = parsed;
+  }
+} catch {
+  notifiedLatestByTxn = {};
+}
 
 // ===== NAVIGATION =====
 function switchPage(p) {
@@ -39,10 +292,14 @@ function switchPage(p) {
   document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(x => x.classList.remove('active'));
   document.getElementById('page-' + p).classList.add('active');
-  document.getElementById('nav-' + p).classList.add('active');
+  const navButton = document.getElementById('nav-' + p);
+  if (navButton) {
+    navButton.classList.add('active');
+  }
   if (p === 'analytics') { setTimeout(initAnalytics, 50); }
   if (p === 'expenses') { renderExpenses(); }
   if (p === 'profits') { renderProfits(); }
+  if (p === 'reports') { renderReportsPage(); }
   if (p === 'developer') { refreshDeveloperOverview(); }
 }
 
@@ -151,6 +408,9 @@ function showAppShell() {
   document.getElementById('app').style.visibility = 'visible';
   document.getElementById('session-user').textContent = `${authSession.userName} (${authSession.role})`;
   applyRoleUi();
+  askVipNotificationPermission();
+  flushNotifyOutbox();
+  syncReportDataFromServer();
 
   if (requestedPage) {
     const page = requestedPage.toLowerCase();
@@ -168,19 +428,7 @@ async function apiRequest(path, options = {}) {
     });
   }
 
-  const fallbackHeaders = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {})
-  };
-
-  if (authSession?.token) {
-    fallbackHeaders.Authorization = `Bearer ${authSession.token}`;
-  }
-
-  const response = await fetch(API_BASE + path, {
-    ...options,
-    headers: fallbackHeaders
-  });
+  const response = await fetchWithAuth(path, options);
   const isJson = response.headers.get('content-type')?.includes('application/json');
   const body = isJson ? await response.json() : await response.text();
   if (!response.ok) {
@@ -268,7 +516,179 @@ async function registerVipServiceWorker() {
   }
 }
 
-async function notifyLastTransaction() {
+async function askVipNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    try {
+      await Notification.requestPermission();
+    } catch {
+      // Ignore permission errors.
+    }
+  }
+}
+
+function shouldQueueNotifyError(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return !navigator.onLine
+    || msg.includes('failed to fetch')
+    || msg.includes('network')
+    || msg.includes('timeout');
+}
+
+function buildNotifyPayload(txn, workerId, mode) {
+  const customerName = getCustomerNameById(txn.customerId);
+  const amountLabel = txn.type === 'won'
+    ? `${Math.round(txn.amount).toLocaleString()} WON`
+    : `${txn.amount.toLocaleString()} USD`;
+  const convertedLabel = txn.type === 'won'
+    ? `${(txn.convertedAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} USD`
+    : `${Math.round(txn.convertedAmount || 0).toLocaleString()} WON`;
+
+  return {
+    title: 'Yangi pul harakati',
+    message: `${customerName}: ${amountLabel}, kurs ${txn.rate}, auto ${convertedLabel}`,
+    relatedType: 'transaction',
+    relatedId: txn.id,
+    targetRole: 'Worker',
+    targetUserId: workerId,
+    isLatestTransaction: mode === 'latest',
+    transactionCreatedAtUtc: mode === 'latest' ? txn.createdAt : null
+  };
+}
+
+function markLatestNotified(txnId) {
+  notifiedLatestByTxn[txnId] = {
+    notifiedAt: new Date().toISOString()
+  };
+  saveNotifiedLatestMap();
+}
+
+function isLatestNotifyBlocked(txn) {
+  if (!txn) return { blocked: true, reason: 'Avval tranzaksiya saqlang' };
+
+  const ageMs = Date.now() - new Date(txn.createdAt).getTime();
+  if (ageMs > 60 * 60 * 1000) {
+    return { blocked: true, reason: 'Latest tranzaksiya 1 soatdan eski' };
+  }
+
+  if (notifiedLatestByTxn[txn.id]) {
+    return { blocked: true, reason: 'Bu latest tranzaksiya allaqachon notify qilingan' };
+  }
+
+  return { blocked: false, reason: '' };
+}
+
+function isLatestPayloadExpired(payload) {
+  if (!payload?.isLatestTransaction || !payload?.transactionCreatedAtUtc) return false;
+  const ageMs = Date.now() - new Date(payload.transactionCreatedAtUtc).getTime();
+  return ageMs > 60 * 60 * 1000;
+}
+
+function shouldDropNotifyError(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('already been notified')
+    || msg.includes('older than 1 hour')
+    || msg.includes('active notification for this transaction');
+}
+
+async function loadWorkersForNotify() {
+  const select = document.getElementById('notify-worker-select');
+  select.innerHTML = '<option value="">Worker tanlang...</option>';
+
+  const rows = await apiRequest('/api/auth/workers');
+  notifyWorkers = Array.isArray(rows) ? rows : [];
+  notifyWorkers.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.id;
+    opt.textContent = w.userName;
+    select.appendChild(opt);
+  });
+}
+
+function loadTransactionsForNotify(mode) {
+  const customerSelect = document.getElementById('notify-customer-select');
+  const select = document.getElementById('notify-transaction-select');
+  select.innerHTML = '<option value="">Tranzaksiya tanlang...</option>';
+
+  const customerId = customerSelect ? customerSelect.value : '';
+  let rows = [...DB.transactions];
+
+  if (mode === 'manual' && customerId) {
+    rows = rows.filter(t => t.customerId === customerId);
+  }
+
+  rows = rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  rows = mode === 'latest' ? rows.slice(0, 1) : rows;
+
+  rows.forEach(txn => {
+    const opt = document.createElement('option');
+    opt.value = txn.id;
+    opt.textContent = formatTxnSummary(txn);
+    select.appendChild(opt);
+  });
+
+  if (rows.length) {
+    select.value = rows[0].id;
+  }
+}
+
+function loadCustomersForNotify(mode) {
+  const select = document.getElementById('notify-customer-select');
+  if (!select) return;
+
+  select.innerHTML = '<option value="">Barcha mijozlar</option>';
+  if (mode !== 'manual') {
+    select.value = '';
+    return;
+  }
+
+  const usedCustomerIds = new Set(DB.transactions.map(t => t.customerId));
+  const rows = DB.customers
+    .filter(c => usedCustomerIds.has(c.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  rows.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    select.appendChild(opt);
+  });
+}
+
+function onNotifyCustomerChange() {
+  if (notifyModalMode !== 'manual') return;
+  loadTransactionsForNotify('manual');
+  updateNotifyPreview();
+}
+
+function updateNotifyPreview() {
+  const workerId = document.getElementById('notify-worker-select').value;
+  const txnId = document.getElementById('notify-transaction-select').value;
+  const preview = document.getElementById('notify-preview');
+
+  const worker = notifyWorkers.find(w => w.id === workerId);
+  const txn = getTransactionById(txnId);
+
+  if (!worker || !txn) {
+    preview.textContent = 'Tanlashni kutmoqda...';
+    return;
+  }
+
+  preview.textContent = `${worker.userName} -> ${formatTxnSummary(txn)}`;
+}
+
+function setNotifyModalError(msg) {
+  const box = document.getElementById('notify-modal-msg');
+  if (!msg) {
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  box.style.display = 'block';
+  box.textContent = msg;
+}
+
+async function openNotifyModal(mode) {
   if (!authSession) {
     showToast('Avval tizimga kiring', 'error');
     return;
@@ -280,35 +700,143 @@ async function notifyLastTransaction() {
     return;
   }
 
-  if (!lastSavedTransaction) {
-    showToast('Avval tranzaksiyani saqlang', 'error');
+  notifyModalMode = mode === 'manual' ? 'manual' : 'latest';
+  const latestTxn = getLatestTransaction();
+  if (!latestTxn && notifyModalMode === 'latest') {
+    showToast('Avval tranzaksiya saqlang', 'error');
     return;
   }
 
-  const c = DB.customers.find(x => x.id === lastSavedTransaction.customerId);
-  const customerName = c?.name || 'Noma\'lum mijoz';
-  const amountLabel = lastSavedTransaction.type === 'won'
-    ? `${Math.round(lastSavedTransaction.amount).toLocaleString()} WON`
-    : `${lastSavedTransaction.amount.toLocaleString()} USD`;
-  const convertedLabel = lastSavedTransaction.type === 'won'
-    ? `${(lastSavedTransaction.convertedAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} USD`
-    : `${Math.round(lastSavedTransaction.convertedAmount || 0).toLocaleString()} WON`;
+  if (notifyModalMode === 'latest') {
+    const guard = isLatestNotifyBlocked(latestTxn);
+    if (guard.blocked) {
+      showToast(guard.reason, 'error');
+      return;
+    }
+  }
 
   try {
-    await apiRequest('/api/notifications', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: 'Yangi pul harakati',
-        message: `${customerName}: ${amountLabel}, kurs ${lastSavedTransaction.rate}, auto ${convertedLabel}`,
-        relatedType: 'transaction',
-        relatedId: lastSavedTransaction.id,
-        targetRole: 'Worker'
-      })
-    });
-    showToast('Worker ga notify yuborildi', 'success');
+    await loadWorkersForNotify();
+    loadCustomersForNotify(notifyModalMode);
+    loadTransactionsForNotify(notifyModalMode);
+    const title = document.getElementById('notify-modal-title');
+    const customerGroup = document.getElementById('notify-customer-group');
+    if (title) {
+      title.textContent = notifyModalMode === 'manual'
+        ? 'WORKERGA NOTIFY (TRANZAKSIYA TANLANG)'
+        : 'WORKERGA NOTIFY (LATEST)';
+    }
+    if (customerGroup) {
+      customerGroup.style.display = notifyModalMode === 'manual' ? 'block' : 'none';
+    }
+    setNotifyModalError('');
+    updateNotifyPreview();
+    document.getElementById('notify-modal').classList.add('open');
   } catch (e) {
-    showToast('Notify xato: ' + e.message, 'error');
+    showToast('Worker ro\'yxatini olishda xato: ' + e.message, 'error');
   }
+}
+
+function closeNotifyModal() {
+  document.getElementById('notify-modal').classList.remove('open');
+  setNotifyModalError('');
+}
+
+async function sendNotifyPayload(payload, txnId, mode) {
+  await apiRequest('/api/notifications', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+  if (mode === 'latest') {
+    markLatestNotified(txnId);
+  }
+}
+
+async function sendNotifyFromModal() {
+  const workerId = document.getElementById('notify-worker-select').value;
+  const txnId = document.getElementById('notify-transaction-select').value;
+  const txn = getTransactionById(txnId);
+
+  if (!workerId) {
+    setNotifyModalError('Worker tanlang.');
+    return;
+  }
+
+  if (!txn) {
+    setNotifyModalError('Tranzaksiya topilmadi.');
+    return;
+  }
+
+  if (notifyModalMode === 'latest') {
+    const latestTxn = getLatestTransaction();
+    if (!latestTxn || latestTxn.id !== txn.id) {
+      setNotifyModalError('Latest tranzaksiya o\'zgargan. Qayta oching.');
+      return;
+    }
+
+    const guard = isLatestNotifyBlocked(latestTxn);
+    if (guard.blocked) {
+      setNotifyModalError(guard.reason);
+      return;
+    }
+  }
+
+  const mode = getNotifyModeLabel(notifyModalMode);
+  const payload = buildNotifyPayload(txn, workerId, mode);
+
+  try {
+    await sendNotifyPayload(payload, txn.id, mode);
+    showToast('Worker ga notify yuborildi', 'success');
+    closeNotifyModal();
+  } catch (e) {
+    if (shouldQueueNotifyError(e)) {
+      notifyOutbox.push({
+        payload,
+        txnId: txn.id,
+        mode,
+        createdAt: new Date().toISOString()
+      });
+      saveNotifyOutbox();
+      showToast('Offline: notify queue ga saqlandi', 'success');
+      closeNotifyModal();
+      return;
+    }
+
+    setNotifyModalError('Notify xato: ' + e.message);
+  }
+}
+
+async function flushNotifyOutbox() {
+  if (!notifyOutbox.length || !authSession) return;
+  const pending = [...notifyOutbox];
+  const failed = [];
+
+  for (const item of pending) {
+    const mode = getNotifyModeLabel(item.mode);
+
+    if (mode === 'latest' && isLatestPayloadExpired(item.payload)) {
+      continue;
+    }
+
+    try {
+      await sendNotifyPayload(item.payload, item.txnId, mode);
+    } catch (e) {
+      if (mode === 'latest' && shouldDropNotifyError(e)) {
+        markLatestNotified(item.txnId);
+        continue;
+      }
+
+      if (shouldDropNotifyError(e)) {
+        continue;
+      }
+
+      failed.push(item);
+    }
+  }
+
+  notifyOutbox = failed;
+  saveNotifyOutbox();
 }
 
 async function generateWorkerInviteLink() {
@@ -993,22 +1521,116 @@ function saveExpense() {
 
   if (!desc || !amount) { showToast('Tavsif va miqdorni kiriting!', 'error'); return; }
 
-  DB.expenses.push({ id: 'e_' + Date.now(), desc, amount, currency, cat, date, createdAt: new Date().toISOString() });
-  save();
-  closeExpenseModal();
-  renderExpenses();
-  showToast('Rasxod saqlandi', 'success');
-  document.getElementById('exp-desc').value = '';
-  document.getElementById('exp-amount').value = '';
-  document.getElementById('exp-cat').value = '';
+  const localItem = { id: 'e_' + Date.now(), desc, amount, currency, cat, date, createdAt: new Date().toISOString() };
+
+  const commitLocal = item => {
+    DB.expenses.push(item);
+    save();
+    closeExpenseModal();
+    renderExpenses();
+    refreshReportsPageIfOpen();
+    showToast('Rasxod saqlandi', 'success');
+    document.getElementById('exp-desc').value = '';
+    document.getElementById('exp-amount').value = '';
+    document.getElementById('exp-cat').value = '';
+  };
+
+  if (authSession && navigator.onLine) {
+    apiRequest('/api/reports/expenses', {
+      method: 'POST',
+      body: JSON.stringify(toReportEntryPayload(localItem))
+    }).then(response => {
+      commitLocal(mapServerReportItem(response, 'e'));
+      syncReportDataFromServer();
+    }).catch(() => {
+      commitLocal(localItem);
+    });
+    return;
+  }
+
+  commitLocal(localItem);
+}
+
+function getFilteredReportRows(rows) {
+  const month = getReportMonth();
+  return rows.filter(row => isRecordInSelectedMonth(row, month));
+}
+
+function renderWeekSummary(containerId, rows, toneColor) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const weeks = buildFourWeekSummary(rows);
+  if (weeks.length === 0) {
+    container.innerHTML = '<div class="stat-card"><div class="stat-label">Ma\'lumot yo\'q</div><div class="stat-value">0 ₩</div></div>';
+    return;
+  }
+
+  container.innerHTML = weeks.map(item => `
+    <div class="stat-card">
+      <div class="stat-label">Hafta ${item.week}</div>
+      <div class="stat-value" style="color:${toneColor}">${formatReportMoney(item.wonEquivalent)} ₩</div>
+      <div class="stat-sub">W:${formatReportMoney(item.wonTotal)} · $:${item.usdTotal.toLocaleString()} · ${item.count} ta</div>
+    </div>
+  `).join('');
+}
+
+function renderReportsPage() {
+  setReportMonth(reportMonth, true);
+
+  renderReportsOverview();
+
+  if (navigator.onLine) {
+    syncReportDataFromServer().then(() => {
+      if (document.getElementById('page-reports')?.classList.contains('active')) {
+        renderReportsOverview();
+      }
+    });
+  }
+}
+
+function renderReportsOverview() {
+  const expenseRows = getFilteredReportRows(DB.expenses);
+  const profitRows = getFilteredReportRows(DB.profits);
+  const expenseWon = expenseRows.filter(row => row.currency === 'won').reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+  const expenseUsd = expenseRows.filter(row => row.currency === 'usd').reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+  const profitWon = profitRows.filter(row => row.currency === 'won').reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+  const profitUsd = profitRows.filter(row => row.currency === 'usd').reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+
+  const expenseWonEq = expenseWon + (expenseUsd * 1350);
+  const profitWonEq = profitWon + (profitUsd * 1350);
+  const netWonEq = profitWonEq - expenseWonEq;
+
+  const expenseTotal = document.getElementById('report-expense-total');
+  const profitTotal = document.getElementById('report-profit-total');
+  const netTotal = document.getElementById('report-net-total');
+  const rowCount = document.getElementById('report-row-count');
+  const reportMonthTitle = document.getElementById('report-month-title');
+
+  if (expenseTotal) expenseTotal.textContent = `${formatReportMoney(expenseWonEq)} ₩`;
+  if (profitTotal) profitTotal.textContent = `${formatReportMoney(profitWonEq)} ₩`;
+  if (netTotal) netTotal.textContent = `${formatReportMoney(netWonEq)} ₩`;
+  if (rowCount) rowCount.textContent = `${expenseRows.length + profitRows.length} ta yozuv`;
+  if (reportMonthTitle) reportMonthTitle.textContent = reportMonth;
+
+  renderWeekSummary('report-exp-week-summary', expenseRows, 'var(--red)');
+  renderWeekSummary('report-profit-week-summary', profitRows, 'var(--green)');
+}
+
+function refreshReportsPageIfOpen() {
+  const page = document.getElementById('page-reports');
+  if (page && page.classList.contains('active')) {
+    renderReportsPage();
+  }
 }
 
 function renderExpenses() {
   const list = document.getElementById('expense-list');
-  if (DB.expenses.length === 0) {
+  const reportRows = getFilteredReportRows(DB.expenses);
+  if (reportRows.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="es-icon">💸</div><div class="es-text">Rasxodlar yo\'q</div></div>';
   } else {
-    const sorted = [...DB.expenses].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const sorted = [...reportRows].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     list.innerHTML = sorted.map(e => `
       <div class="expense-item">
         <div class="ex-icon">💸</div>
@@ -1023,7 +1645,7 @@ function renderExpenses() {
   // Summary
   let totalWon = 0, totalUsd = 0;
   const cats = {};
-  DB.expenses.forEach(e => {
+  reportRows.forEach(e => {
     if (e.currency === 'won') totalWon += e.amount; else totalUsd += e.amount;
     cats[e.cat] = (cats[e.cat] || 0) + (e.currency === 'won' ? e.amount : e.amount * 1350);
   });
@@ -1035,6 +1657,8 @@ function renderExpenses() {
       <span style="font-size:14px">${k}</span>
       <span style="font-size:13px;font-family:'Space Mono',monospace;color:var(--red)">${Math.round(v).toLocaleString()} ₩</span>
     </div>`).join('');
+
+  renderWeekSummary('exp-week-summary', reportRows, 'var(--red)');
 }
 
 function switchExpTab(t) {
@@ -1065,24 +1689,45 @@ function saveProfit() {
 
   if (!desc || !amount) { showToast('Tavsif va miqdorni kiriting!', 'error'); return; }
 
-  DB.profits.push({ id: 'p_' + Date.now(), desc, amount, currency, cat, date, createdAt: new Date().toISOString() });
-  save();
-  closeProfitModal();
-  renderProfits();
-  showToast('Foyda saqlandi', 'success');
-  document.getElementById('profit-desc').value = '';
-  document.getElementById('profit-amount').value = '';
-  document.getElementById('profit-cat').value = '';
+  const localItem = { id: 'p_' + Date.now(), desc, amount, currency, cat, date, createdAt: new Date().toISOString() };
+
+  const commitLocal = item => {
+    DB.profits.push(item);
+    save();
+    closeProfitModal();
+    renderProfits();
+    refreshReportsPageIfOpen();
+    showToast('Foyda saqlandi', 'success');
+    document.getElementById('profit-desc').value = '';
+    document.getElementById('profit-amount').value = '';
+    document.getElementById('profit-cat').value = '';
+  };
+
+  if (authSession && navigator.onLine) {
+    apiRequest('/api/reports/profits', {
+      method: 'POST',
+      body: JSON.stringify(toReportEntryPayload(localItem))
+    }).then(response => {
+      commitLocal(mapServerReportItem(response, 'p'));
+      syncReportDataFromServer();
+    }).catch(() => {
+      commitLocal(localItem);
+    });
+    return;
+  }
+
+  commitLocal(localItem);
 }
 
 function renderProfits() {
   const list = document.getElementById('profit-list');
   if (!list) return;
+  const reportRows = getFilteredReportRows(DB.profits);
 
-  if (DB.profits.length === 0) {
+  if (reportRows.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="es-icon">📈</div><div class="es-text">Foydalar yo\'q</div></div>';
   } else {
-    const sorted = [...DB.profits].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const sorted = [...reportRows].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     list.innerHTML = sorted.map(p => `
       <div class="expense-item">
         <div class="ex-icon" style="background:rgba(48,224,154,.12)">📈</div>
@@ -1096,7 +1741,7 @@ function renderProfits() {
 
   let totalWon = 0, totalUsd = 0;
   const cats = {};
-  DB.profits.forEach(p => {
+  reportRows.forEach(p => {
     if (p.currency === 'won') totalWon += p.amount; else totalUsd += p.amount;
     cats[p.cat] = (cats[p.cat] || 0) + (p.currency === 'won' ? p.amount : p.amount * 1350);
   });
@@ -1109,6 +1754,8 @@ function renderProfits() {
       <span style="font-size:14px">${k}</span>
       <span style="font-size:13px;font-family:'Space Mono',monospace;color:var(--green)">${Math.round(v).toLocaleString()} ₩</span>
     </div>`).join('');
+
+  renderWeekSummary('profit-week-summary', reportRows, 'var(--green)');
 }
 
 function switchProfitTab(t) {
@@ -1116,6 +1763,103 @@ function switchProfitTab(t) {
   document.getElementById('profit-tab-summary').style.display = t === 'summary' ? 'block' : 'none';
   document.getElementById('ptab-list').className = 'itab' + (t === 'list' ? ' active' : '');
   document.getElementById('ptab-summary').className = 'itab' + (t === 'summary' ? ' active' : '');
+}
+
+function toExcelReportItem(item) {
+  return {
+    id: item.id,
+    description: item.desc,
+    amount: Number(item.amount) || 0,
+    currency: item.currency,
+    category: item.cat,
+    date: item.date || '',
+    createdAt: item.createdAt || ''
+  };
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function exportReportWorkbook() {
+  if (!authSession) {
+    showToast('Avval tizimga kiring', 'error');
+    return;
+  }
+
+  const month = getReportMonth();
+
+  try {
+    if (!navigator.onLine) {
+      throw new Error('Offline holatda Excel export ishlamaydi.');
+    }
+
+    const blob = await apiRequestBlob(`/api/reports/excel/export?month=${encodeURIComponent(month)}`, {
+      method: 'GET'
+    });
+    downloadBlob(blob, `report_${month}.xlsx`);
+    showToast('Excel eksport tayyor', 'success');
+  } catch (e) {
+    showToast('Excel export xato: ' + e.message, 'error');
+  }
+}
+
+function triggerReportImport() {
+  if (!authSession) {
+    showToast('Avval tizimga kiring', 'error');
+    return;
+  }
+
+  document.getElementById('report-import-input').value = '';
+  document.getElementById('report-import-input').click();
+}
+
+async function handleReportImportFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (!authSession || !navigator.onLine) {
+    showToast('Excel import uchun faol ulanish kerak', 'error');
+    return;
+  }
+
+  if (!window.confirm('Excel fayldagi expenses/profits joriy ma\'lumotlarni almashtiradi. Davom etilsinmi?')) {
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('workbook', file);
+
+  try {
+    const response = await apiRequestFormData('/api/reports/excel/import', formData);
+    if (!response || !Array.isArray(response.expenses) || !Array.isArray(response.profits)) {
+      throw new Error('Invalid import payload');
+    }
+
+    DB.expenses = response.expenses.map(item => mapServerReportItem(item, 'e'));
+    DB.profits = response.profits.map(item => mapServerReportItem(item, 'p'));
+
+    if (response.month) {
+      setReportMonth(response.month, true);
+    }
+
+    save();
+    renderExpenses();
+    renderProfits();
+    renderAnalyticsStats();
+    showToast('Excel import muvaffaqiyatli', 'success');
+  } catch (e) {
+    showToast('Excel import xato: ' + e.message, 'error');
+  } finally {
+    event.target.value = '';
+  }
 }
 
 // ===== MOCK DATA (only if DB is empty) =====
@@ -1163,6 +1907,11 @@ function loadMockData() {
 // ===== INPUT EVENTS =====
 document.getElementById('amount-input').addEventListener('input', updateConversionPreview);
 document.getElementById('rate-input').addEventListener('input', updateConversionPreview);
+document.getElementById('report-month-input').addEventListener('change', e => setReportMonth(e.target.value));
+document.getElementById('notify-worker-select').addEventListener('change', updateNotifyPreview);
+document.getElementById('notify-customer-select').addEventListener('change', onNotifyCustomerChange);
+document.getElementById('notify-transaction-select').addEventListener('change', updateNotifyPreview);
+document.getElementById('report-import-input').addEventListener('change', handleReportImportFile);
 document.addEventListener('click', e => {
   const sr = document.getElementById('search-results');
   if (!e.target.closest('#customer-search') && !e.target.closest('#search-results')) {
@@ -1175,6 +1924,11 @@ loadMockData();
 // ===== INIT =====
 setNow();
 updateConversionPreview();
+if (localStorage.getItem(REPORT_MONTH_KEY)) {
+  setReportMonth(reportMonth, true);
+} else {
+  setReportMonth(getLatestReportMonthFromData(), true);
+}
 checkExistingSession();
 setupInviteRegistrationMode();
 registerVipServiceWorker();
@@ -1191,4 +1945,10 @@ document.getElementById('edit-customer-modal').addEventListener('click', functio
 });
 document.getElementById('profit-modal').addEventListener('click', function(e) {
   if (e.target === this) closeProfitModal();
+});
+document.getElementById('notify-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeNotifyModal();
+});
+window.addEventListener('online', () => {
+  flushNotifyOutbox();
 });

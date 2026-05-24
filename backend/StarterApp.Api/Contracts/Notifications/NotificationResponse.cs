@@ -4,6 +4,7 @@ public sealed record NotificationResponse(
     Guid Id,
     string CreatedByUserName,
     string TargetRole,
+    string? TargetUserId,
     string Title,
     string Message,
     string RelatedType,

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kurs-vip-v2';
+const CACHE_NAME = 'kurs-vip-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

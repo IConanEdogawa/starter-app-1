@@ -8,6 +8,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<WorkerCashAction> WorkerCashActions => Set<WorkerCashAction>();
     public DbSet<NotificationEvent> Notifications => Set<NotificationEvent>();
+    public DbSet<ReportExpense> ReportExpenses => Set<ReportExpense>();
+    public DbSet<ReportProfit> ReportProfits => Set<ReportProfit>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -59,6 +61,30 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.UsedByUserName).HasMaxLength(100);
             entity.HasIndex(x => x.Token).IsUnique();
             entity.HasIndex(x => x.ExpiresAt);
+        });
+
+        modelBuilder.Entity<ReportExpense>(entity =>
+        {
+            entity.ToTable("report_expenses");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.HasIndex(x => x.OccurredAtUtc);
+            entity.HasIndex(x => x.CreatedAtUtc);
+        });
+
+        modelBuilder.Entity<ReportProfit>(entity =>
+        {
+            entity.ToTable("report_profits");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Currency).HasMaxLength(8).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.HasIndex(x => x.OccurredAtUtc);
+            entity.HasIndex(x => x.CreatedAtUtc);
         });
     }
 

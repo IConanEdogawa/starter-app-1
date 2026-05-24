@@ -138,4 +138,22 @@ public sealed class AuthController(AppDbContext db, IJwtTokenService jwtTokenSer
             Role = User.FindFirst("http://schemas.microsoft.com/ws/2008/06/identity/claims/role")?.Value
         });
     }
+
+    [HttpGet("workers")]
+    [Authorize(Roles = "VIP,Developer")]
+    public async Task<ActionResult<IReadOnlyList<object>>> Workers()
+    {
+        var workers = await db.Users
+            .Where(x => x.Role == UserRole.Worker)
+            .OrderBy(x => x.UserName)
+            .Select(x => new
+            {
+                id = x.Id,
+                userName = x.UserName,
+                role = x.Role.ToString()
+            })
+            .ToListAsync();
+
+        return Ok(workers);
+    }
 }

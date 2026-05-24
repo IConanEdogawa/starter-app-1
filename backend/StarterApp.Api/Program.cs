@@ -92,6 +92,7 @@ using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.Database.Migrate();
+        await EnsureReportTablesAsync(db);
         await DeveloperSeedService.EnsureDeveloperAsync(db, scope.ServiceProvider.GetRequiredService<IConfiguration>());
     }
     catch (Exception ex)
@@ -111,3 +112,33 @@ app.MapControllers();
 app.MapHub<NotificationsHub>("/hubs/notifications");
 
 app.Run();
+
+static async Task EnsureReportTablesAsync(AppDbContext db)
+{
+    const string createExpenses = """
+        CREATE TABLE IF NOT EXISTS report_expenses (
+            id uuid PRIMARY KEY,
+            description character varying(500) NOT NULL,
+            amount numeric(18,2) NOT NULL,
+            currency character varying(8) NOT NULL,
+            category character varying(120) NOT NULL,
+            occurred_at_utc timestamp without time zone NOT NULL,
+            created_at_utc timestamp without time zone NOT NULL
+        );
+        """;
+
+    const string createProfits = """
+        CREATE TABLE IF NOT EXISTS report_profits (
+            id uuid PRIMARY KEY,
+            description character varying(500) NOT NULL,
+            amount numeric(18,2) NOT NULL,
+            currency character varying(8) NOT NULL,
+            category character varying(120) NOT NULL,
+            occurred_at_utc timestamp without time zone NOT NULL,
+            created_at_utc timestamp without time zone NOT NULL
+        );
+        """;
+
+    await db.Database.ExecuteSqlRawAsync(createExpenses);
+    await db.Database.ExecuteSqlRawAsync(createProfits);
+}
