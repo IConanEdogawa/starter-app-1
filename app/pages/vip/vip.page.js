@@ -6,6 +6,7 @@ const requestedPage = new URLSearchParams(window.location.search).get('page');
 const NOTIFY_OUTBOX_KEY = 'kurs_notify_outbox';
 const NOTIFIED_TXN_KEY = 'kurs_notified_latest';
 const REPORT_MONTH_KEY = 'kurs_report_month';
+const THEME_KEY = 'kurs_theme';
 
 let DB = {
   customers: [],
@@ -30,6 +31,65 @@ function saveNotifyOutbox() {
 
 function saveNotifiedLatestMap() {
   try { localStorage.setItem(NOTIFIED_TXN_KEY, JSON.stringify(notifiedLatestByTxn)); } catch(e) {}
+}
+
+function getStoredTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    // Ignore storage errors.
+  }
+
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function applyTheme(theme) {
+  const nextTheme = theme === 'light' ? 'light' : 'dark';
+  document.body.dataset.theme = nextTheme;
+  try { localStorage.setItem(THEME_KEY, nextTheme); } catch {}
+
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    meta.setAttribute('content', nextTheme === 'light' ? '#f4f7fb' : '#0a0a0f');
+  }
+
+  document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+    btn.textContent = nextTheme === 'light' ? 'Qora rejim' : 'Oq rejim';
+  });
+}
+
+function toggleTheme() {
+  applyTheme((document.body.dataset.theme || 'dark') === 'light' ? 'dark' : 'light');
+}
+
+function styleTopControls() {
+  const themeButtons = document.querySelectorAll('[data-theme-toggle]');
+  themeButtons.forEach(btn => {
+    btn.style.webkitAppearance = 'none';
+    btn.style.appearance = 'none';
+    btn.style.width = 'auto';
+    btn.style.borderRadius = '999px';
+    btn.style.padding = '10px 14px';
+    btn.style.border = '1px solid rgba(240,192,64,.28)';
+    btn.style.background = 'linear-gradient(135deg, rgba(240,192,64,.18), rgba(73,166,255,.10))';
+    btn.style.color = 'var(--text)';
+    btn.style.boxShadow = '0 10px 18px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.06)';
+    btn.style.fontFamily = 'Space Mono, monospace';
+    btn.style.letterSpacing = '.8px';
+    btn.style.cursor = 'pointer';
+  });
+
+  const logoutBtn = document.querySelector('#session-bar .btn-secondary');
+  if (logoutBtn) {
+    logoutBtn.style.width = 'auto';
+    logoutBtn.style.borderRadius = '999px';
+    logoutBtn.style.padding = '10px 14px';
+    logoutBtn.style.border = '1px solid rgba(73,166,255,.22)';
+    logoutBtn.style.background = 'linear-gradient(135deg, rgba(73,166,255,.10), rgba(255,255,255,.03))';
+    logoutBtn.style.color = 'var(--text)';
+    logoutBtn.style.boxShadow = '0 10px 18px rgba(0,0,0,.10)';
+  }
 }
 
 function getTransactionById(txnId) {
@@ -181,13 +241,22 @@ async function fetchWithAuth(path, options = {}, includeJsonContentType = true) 
 }
 
 async function apiRequestBlob(path, options = {}) {
-  const response = await fetchWithAuth(path, options, true);
+  // Do not add JSON Content-Type for binary blob downloads
+  const response = await fetchWithAuth(path, options, false);
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || 'Server error');
   }
 
   return response.blob();
+}
+
+// Utility: escape HTML to avoid XSS when inserting untrusted content
+function escapeHtml(input) {
+  const s = String(input === null || input === undefined ? '' : input);
+  return s.replace(/[&<>"'`]/g, function (c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' })[c];
+  });
 }
 
 async function apiRequestFormData(path, formData, options = {}) {
@@ -321,6 +390,8 @@ function applyRoleUi() {
     invite: document.getElementById('nav-invite'),
     developer: document.getElementById('nav-developer')
   };
+  const reportDevBtn = document.getElementById('report-dev-btn');
+  const sessionReportsBtn = document.getElementById('session-reports-btn');
 
   if (role === 'worker') {
     navMap.analytics.style.display = 'none';
@@ -328,6 +399,8 @@ function applyRoleUi() {
     navMap.profits.style.display = 'none';
     navMap.invite.style.display = 'none';
     navMap.developer.style.display = 'none';
+    if (reportDevBtn) reportDevBtn.style.display = 'none';
+    if (sessionReportsBtn) sessionReportsBtn.style.display = 'none';
     switchPage('txn');
     return;
   }
@@ -336,11 +409,14 @@ function applyRoleUi() {
   navMap.expenses.style.display = '';
   navMap.profits.style.display = '';
   navMap.invite.style.display = '';
+  if (sessionReportsBtn) sessionReportsBtn.style.display = '';
 
   if (role === 'developer') {
     navMap.developer.style.display = '';
+    if (reportDevBtn) reportDevBtn.style.display = '';
   } else {
     navMap.developer.style.display = 'none';
+    if (reportDevBtn) reportDevBtn.style.display = 'none';
     if (document.getElementById('page-developer').classList.contains('active')) {
       switchPage('txn');
     }
@@ -408,6 +484,7 @@ function showAppShell() {
   document.getElementById('app').style.visibility = 'visible';
   document.getElementById('session-user').textContent = `${authSession.userName} (${authSession.role})`;
   applyRoleUi();
+  styleTopControls();
   askVipNotificationPermission();
   flushNotifyOutbox();
   syncReportDataFromServer();
@@ -939,31 +1016,42 @@ function searchCustomer(val, autoSelect = false) {
 
   results.style.display = 'block';
   results.innerHTML = matches.slice(0, 5).map(c => `
-    <div class="search-item" onclick="selectCustomer('${c.id}')">
-      <div class="avatar">${c.name[0].toUpperCase()}</div>
+    <div class="search-item" data-id="${encodeURIComponent(c.id)}">
+      <div class="avatar">${escapeHtml((c.name||'')[0]?.toUpperCase()||'')}</div>
       <div class="info">
-        <div class="name">${c.name}</div>
-        <div class="phone">${c.phone || 'Telefon yo\'q'}</div>
+        <div class="name">${escapeHtml(c.name)}</div>
+        <div class="phone">${escapeHtml(c.phone || 'Telefon yo\'q')}</div>
       </div>
     </div>
   `).join('');
+
+  // Attach click handlers safely
+  results.querySelectorAll('.search-item').forEach(el => {
+    el.addEventListener('click', () => selectCustomer(decodeURIComponent(el.dataset.id)));
+  });
 }
 
 function showNewCustomerWarn(val) {
   const warn = document.getElementById('new-customer-warn');
   warn.style.display = 'block';
+  const encoded = encodeURIComponent(val);
   warn.innerHTML = `
     <div class="warn-banner fade-in">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
       <div class="warn-text">
-        <strong>"${val}"</strong> — yangi mijoz?<br>
+        <strong>"${escapeHtml(val)}"</strong> — yangi mijoz?<br>
         <span style="font-size:11px">Agar yozuvda xatolik bo'lsa, tekshiring</span>
         <div class="warn-actions">
-          <button class="btn btn-sm btn-primary" onclick="createAndSelectCustomer('${val}')">✓ Ha, yangi</button>
-          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('customer-search').value='';document.getElementById('new-customer-warn').style.display='none'">✕ Xato</button>
+          <button class="btn btn-sm btn-primary" data-val="${encoded}">✓ Ha, yangi</button>
+          <button class="btn btn-sm btn-secondary" id="new-customer-warn-cancel">✕ Xato</button>
         </div>
       </div>
     </div>`;
+
+  const primaryBtn = warn.querySelector('.warn-actions .btn-primary');
+  if (primaryBtn) primaryBtn.addEventListener('click', () => createAndSelectCustomer(decodeURIComponent(primaryBtn.dataset.val)));
+  const cancelBtn = warn.querySelector('#new-customer-warn-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => { document.getElementById('customer-search').value = ''; document.getElementById('new-customer-warn').style.display = 'none'; });
 }
 
 function createAndSelectCustomer(rawVal) {
@@ -1106,15 +1194,16 @@ function selectCustomer(id) {
   chip.style.display = 'block';
   chip.innerHTML = `
     <div class="customer-chip fade-in">
-      <div class="avatar">${selectedCustomer.name[0].toUpperCase()}</div>
+      <div class="avatar">${escapeHtml((selectedCustomer.name||'')[0]?.toUpperCase()||'')}</div>
       <div class="info">
-        <div class="cname">${selectedCustomer.name}</div>
-        <div class="cphone">${selectedCustomer.phone || 'Telefon yo\'q'}</div>
+        <div class="cname">${escapeHtml(selectedCustomer.name)}</div>
+        <div class="cphone">${escapeHtml(selectedCustomer.phone || 'Telefon yo\'q')}</div>
       </div>
-      <button class="chip-clear" onclick="clearCustomer()">
+      <button class="chip-clear" id="chip-clear-btn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>`;
+  const clearBtn = chip.querySelector('#chip-clear-btn'); if (clearBtn) clearBtn.addEventListener('click', clearCustomer);
 }
 
 function clearCustomer() {
@@ -1440,15 +1529,18 @@ function renderCustomerList() {
   container.innerHTML = DB.customers.map(c => {
     const stats = getCustomerStats(c.id);
     return `
-    <div class="customer-row ${analyticsCustomer === c.id ? 'active' : ''}" onclick="selectAnalyticsCustomer('${c.id}')">
-      <div class="cr-avatar">${c.name[0].toUpperCase()}</div>
+    <div class="customer-row ${analyticsCustomer === c.id ? 'active' : ''}" data-id="${encodeURIComponent(c.id)}">
+      <div class="cr-avatar">${escapeHtml((c.name||'')[0]?.toUpperCase()||'')}</div>
       <div style="flex:1;min-width:0">
-        <div class="cr-name">${c.name}</div>
+        <div class="cr-name">${escapeHtml(c.name)}</div>
         <div class="cr-count">${stats.txnCount} tranzaksiya</div>
       </div>
-      <button onclick="openEditCustomer('${c.id}', event)" style="background:none;border:1px solid var(--border);color:var(--text3);border-radius:7px;padding:5px 9px;cursor:pointer;font-size:11px;margin-left:6px;flex-shrink:0" title="Tahrirlash">✎</button>
+      <button class="edit-customer-btn" data-id="${encodeURIComponent(c.id)}" style="background:none;border:1px solid var(--border);color:var(--text3);border-radius:7px;padding:5px 9px;cursor:pointer;font-size:11px;margin-left:6px;flex-shrink:0" title="Tahrirlash">✎</button>
     </div>`;
   }).join('');
+  // attach handlers
+  container.querySelectorAll('.customer-row').forEach(el => el.addEventListener('click', () => selectAnalyticsCustomer(decodeURIComponent(el.dataset.id))));
+  container.querySelectorAll('.edit-customer-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); openEditCustomer(decodeURIComponent(btn.dataset.id), e); }));
 }
 
 function selectAnalyticsCustomer(cid) {
@@ -1467,8 +1559,8 @@ function renderCustomerDetail(cid) {
   const area = document.getElementById('customer-detail-area');
   area.innerHTML = `
     <div class="customer-detail fade-in">
-      <div class="detail-name">${cust.name}</div>
-      <div class="detail-phone">${cust.phone || 'Tel yo\'q'} · Mijoz ${fmtDate(cust.createdAt)}</div>
+      <div class="detail-name">${escapeHtml(cust.name)}</div>
+      <div class="detail-phone">${escapeHtml(cust.phone || 'Tel yo\'q')} · Mijoz ${escapeHtml(fmtDate(cust.createdAt))}</div>
       <div class="detail-grid">
         <div class="detail-item">
           <div class="dl">WON aylanma</div>
@@ -1490,11 +1582,11 @@ function renderCustomerDetail(cid) {
             <div class="trans-item">
               <div class="trans-icon ${t.type === 'won' ? 'ti-won' : 'ti-usd'}">${t.type === 'won' ? '₩' : '$'}</div>
               <div class="trans-info">
-                <div class="trans-main">${fmtAmount(t.amount, t.type)} · kurs ${t.rate}</div>
-                <div class="trans-date">${fmtDate(t.datetime)}</div>
+                <div class="trans-main">${escapeHtml(fmtAmount(t.amount, t.type))} · kurs ${escapeHtml(t.rate)}</div>
+                <div class="trans-date">${escapeHtml(fmtDate(t.datetime))}</div>
               </div>
               <div>
-                <div class="trans-profit">${t.type === 'won' ? `${(t.convertedAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} $` : `${Math.round(t.convertedAmount || 0).toLocaleString()} ₩`}</div>
+                <div class="trans-profit">${escapeHtml(t.type === 'won' ? `${(t.convertedAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} $` : `${Math.round(t.convertedAmount || 0).toLocaleString()} ₩`)}</div>
               </div>
             </div>`).join('')}
       </div>
@@ -1905,21 +1997,23 @@ function loadMockData() {
 }
 
 // ===== INPUT EVENTS =====
-document.getElementById('amount-input').addEventListener('input', updateConversionPreview);
-document.getElementById('rate-input').addEventListener('input', updateConversionPreview);
-document.getElementById('report-month-input').addEventListener('change', e => setReportMonth(e.target.value));
-document.getElementById('notify-worker-select').addEventListener('change', updateNotifyPreview);
-document.getElementById('notify-customer-select').addEventListener('change', onNotifyCustomerChange);
-document.getElementById('notify-transaction-select').addEventListener('change', updateNotifyPreview);
-document.getElementById('report-import-input').addEventListener('change', handleReportImportFile);
+const amountEl = document.getElementById('amount-input'); if (amountEl) amountEl.addEventListener('input', updateConversionPreview);
+const rateEl = document.getElementById('rate-input'); if (rateEl) rateEl.addEventListener('input', updateConversionPreview);
+const monthEl = document.getElementById('report-month-input'); if (monthEl) monthEl.addEventListener('change', e => setReportMonth(e.target.value));
+const notifyWorkerEl = document.getElementById('notify-worker-select'); if (notifyWorkerEl) notifyWorkerEl.addEventListener('change', updateNotifyPreview);
+const notifyCustomerEl = document.getElementById('notify-customer-select'); if (notifyCustomerEl) notifyCustomerEl.addEventListener('change', onNotifyCustomerChange);
+const notifyTxnEl = document.getElementById('notify-transaction-select'); if (notifyTxnEl) notifyTxnEl.addEventListener('change', updateNotifyPreview);
+const reportImportEl = document.getElementById('report-import-input'); if (reportImportEl) reportImportEl.addEventListener('change', handleReportImportFile);
 document.addEventListener('click', e => {
   const sr = document.getElementById('search-results');
   if (!e.target.closest('#customer-search') && !e.target.closest('#search-results')) {
-    sr.style.display = 'none';
+    if (sr) sr.style.display = 'none';
   }
 });
 
 loadMockData();
+applyTheme(getStoredTheme());
+styleTopControls();
 
 // ===== INIT =====
 setNow();
@@ -1934,21 +2028,12 @@ setupInviteRegistrationMode();
 registerVipServiceWorker();
 
 // Close modals on overlay click
-document.getElementById('expense-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeExpenseModal();
-});
-document.getElementById('new-customer-modal').addEventListener('click', function(e) {
-  if (e.target === this) this.classList.remove('open');
-});
-document.getElementById('edit-customer-modal').addEventListener('click', function(e) {
-  if (e.target === this) this.classList.remove('open');
-});
-document.getElementById('profit-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeProfitModal();
-});
-document.getElementById('notify-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeNotifyModal();
-});
+const expenseModal = document.getElementById('expense-modal'); if (expenseModal) expenseModal.addEventListener('click', function(e) { if (e.target === this) closeExpenseModal(); });
+const newCustomerModal = document.getElementById('new-customer-modal'); if (newCustomerModal) newCustomerModal.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
+const editCustomerModal = document.getElementById('edit-customer-modal'); if (editCustomerModal) editCustomerModal.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
+const profitModal = document.getElementById('profit-modal'); if (profitModal) profitModal.addEventListener('click', function(e) { if (e.target === this) closeProfitModal(); });
+const notifyModal = document.getElementById('notify-modal'); if (notifyModal) notifyModal.addEventListener('click', function(e) { if (e.target === this) closeNotifyModal(); });
+document.querySelectorAll('[data-theme-toggle]').forEach(btn => btn.addEventListener('click', toggleTheme));
 window.addEventListener('online', () => {
   flushNotifyOutbox();
 });

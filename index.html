@@ -14,14 +14,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<link rel="stylesheet" href="app/pages/vip/vip.page.css">
+<link rel="stylesheet" href="app/pages/vip/vip.page.css?v=5">
 </head>
 <body>
 
 <div id="auth-screen" class="auth-screen">
   <div class="auth-card">
-    <div class="auth-brand">KURS</div>
-    <div class="auth-sub">VIP / Worker kirish</div>
+    <div class="auth-topbar">
+      <div>
+        <div class="auth-brand">KURS</div>
+        <div class="auth-sub">VIP / Worker kirish</div>
+      </div>
+      <button type="button" class="btn btn-sm btn-secondary theme-toggle-btn" data-theme-toggle style="width:auto">Qora rejim</button>
+    </div>
 
     <div class="quick-links" style="margin-bottom:14px">
       <a class="quick-link" href="/">VIP home</a>
@@ -73,7 +78,11 @@
 <div id="app">
   <div id="session-bar" class="session-bar" style="display:none">
     <div id="session-user" class="session-user">USER</div>
-    <button class="btn btn-sm btn-secondary" onclick="logoutUser()" style="width:auto">Chiqish</button>
+    <div class="session-actions">
+      <button type="button" class="btn btn-sm btn-ghost session-report-btn" id="session-reports-btn" onclick="switchPage('reports')" style="width:auto;display:none">Reports</button>
+      <button type="button" class="btn btn-sm btn-secondary theme-toggle-btn theme-toggle-btn-sm" data-theme-toggle style="width:auto">Qora rejim</button>
+      <button class="btn btn-sm btn-secondary" onclick="logoutUser()" style="width:auto">Chiqish</button>
+    </div>
   </div>
   <!-- NAV -->
   <nav>
@@ -261,6 +270,12 @@
         <div id="expense-list"></div>
       </div>
       <div id="exp-tab-summary" style="display:none">
+        <div class="week-chip-row" aria-label="Rasxod hafta teglari">
+          <button type="button" class="week-chip">Hafta 1</button>
+          <button type="button" class="week-chip">Hafta 2</button>
+          <button type="button" class="week-chip">Hafta 3</button>
+          <button type="button" class="week-chip">Hafta 4</button>
+        </div>
         <div class="stats-row">
           <div class="stat-card"><div class="stat-label">Jami (WON)</div><div class="stat-value red" id="exp-total-won">0 ₩</div></div>
           <div class="stat-card"><div class="stat-label">Jami (USD)</div><div class="stat-value red" id="exp-total-usd">0 $</div></div>
@@ -291,6 +306,12 @@
         <div id="profit-list"></div>
       </div>
       <div id="profit-tab-summary" style="display:none">
+        <div class="week-chip-row" aria-label="Foyda hafta teglari">
+          <button type="button" class="week-chip">Hafta 1</button>
+          <button type="button" class="week-chip">Hafta 2</button>
+          <button type="button" class="week-chip">Hafta 3</button>
+          <button type="button" class="week-chip">Hafta 4</button>
+        </div>
         <div class="stats-row">
           <div class="stat-card"><div class="stat-label">Jami (WON)</div><div class="stat-value green" id="profit-total-won">0 ₩</div></div>
           <div class="stat-card"><div class="stat-label">Jami (USD)</div><div class="stat-value green" id="profit-total-usd">0 $</div></div>
@@ -366,10 +387,10 @@
         <div class="page-title">REPORTS</div>
         <div class="page-sub">Excel sinxronizatsiya va oy bo'yicha xulosa</div>
       </div>
-      <button class="btn btn-sm btn-secondary" onclick="switchPage('developer')" style="width:auto">DEV</button>
+      <button class="btn btn-sm btn-secondary report-dev-btn" id="report-dev-btn" onclick="switchPage('developer')" style="width:auto;display:none">DEV</button>
     </div>
     <div class="page-scroll">
-      <div class="card">
+      <div class="card reports-control-card">
         <div class="card-title">REPORT CONTROL</div>
         <div class="two-col">
           <div class="input-group">
@@ -575,7 +596,7 @@
 <input id="report-import-input" type="file" accept=".xlsx,.xls" style="display:none">
 
 <script src="app/core/frontend-infra.js"></script>
-<script src="app/pages/vip/vip.page.js"></script>
+<script src="app/pages/vip/vip.page.js?v=5"></script>
 </body>
 </html>
 

@@ -67,6 +67,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("report_expenses");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.Description).HasColumnName("description");
+            entity.Property(x => x.Amount).HasColumnName("amount");
+            entity.Property(x => x.Currency).HasColumnName("currency");
+            entity.Property(x => x.Category).HasColumnName("category");
+            entity.Property(x => x.OccurredAtUtc).HasColumnName("occurred_at_utc");
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
             entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
             entity.Property(x => x.Currency).HasMaxLength(8).IsRequired();
             entity.Property(x => x.Category).HasMaxLength(120).IsRequired();
@@ -79,6 +86,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("report_profits");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.Description).HasColumnName("description");
+            entity.Property(x => x.Amount).HasColumnName("amount");
+            entity.Property(x => x.Currency).HasColumnName("currency");
+            entity.Property(x => x.Category).HasColumnName("category");
+            entity.Property(x => x.OccurredAtUtc).HasColumnName("occurred_at_utc");
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
             entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
             entity.Property(x => x.Currency).HasMaxLength(8).IsRequired();
             entity.Property(x => x.Category).HasMaxLength(120).IsRequired();
