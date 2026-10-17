@@ -8,7 +8,7 @@ public static class DeveloperSeedService
 {
     public static async Task EnsureDeveloperAsync(AppDbContext db, IConfiguration configuration, CancellationToken ct = default)
     {
-        var enabled = configuration.GetValue<bool?>("DeveloperSeed:Enabled") ?? true;
+        var enabled = configuration.GetValue<bool?>("DeveloperSeed:Enabled") ?? false;
         if (!enabled) return;
 
         var userName = configuration["DeveloperSeed:UserName"]?.Trim();

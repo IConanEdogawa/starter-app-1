@@ -1,0 +1,32 @@
+# .NET build output
+bin/
+obj/
+bin-verify/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+publish/
+*.user
+*.suo
+*.userprefs
+.vs/
+.vscode/
+*.rsuser
+TestResults/
+*.nupkg
+
+# Local configuration / secrets (use user-secrets or environment variables)
+appsettings.*.local.json
+appsettings.local.json
+*.env
+.env
+.env.*
+
+# Node
+node_modules/
+
+# OS / tooling
+.DS_Store
+Thumbs.db
+.vercel
